@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      font-family: "Raleway", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+      color: white;
+      background-color: #1a1a1a;
+    }
+
+    input {
+      background-color: white;
+      color: black;
+    }
+
+    .messageform {
+      margin-bottom: 0;
+    }
+
+    .main {
+      text-align: center;
+    }
+
+    .highlight {
+      background-color: yellow;
+      color: black;
+    }
+
+    .sticky {
+      top: 0;
+      position: sticky;
+    }
+
+    .shadow__btn {
+      padding: 10px 20px;
+      border: none;
+      font-size: 17px;
+      color: #fff;
+      border-radius: 7px;
+      letter-spacing: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      transition: 0.5s;
+      transition-property: box-shadow;
+    }
+
+    .shadow__btn {
+      background: rgb(0, 140, 255);
+      box-shadow: 0 0 25px rgb(0, 140, 255);
+    }
+
+    .shadow__btn:hover {
+      box-shadow: 0 0 5px rgb(0, 140, 255),
+        0 0 25px rgb(0, 140, 255),
+        0 0 50px rgb(0, 140, 255),
+        0 0 100px rgb(0, 140, 255);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="main">
+    <h1>Elliptical - Chatting Platform</h1>
+    <p>Version 0.15 - Prerelease</p>
+    <h3 class="sticky" style="background-color: #1a1a1a; display: inline;">Their are <span id="usersonline"></span> users online currently</h3>
+    </h3>
+    <br>
+    <ul id="messages"></ul>
+    <form id="form" action="">
+      <input id="username" placeholder="Username" class="messageform" required />
+      <input id="input" autocomplete="off" placeholder="Message" required class="messageform" />
+      <button class="shadow__btn" class="messageform" >Send</button>
+    </form>
+    <div id="admin" style="display: none;">
+      <form id="adminform" action="">
+        <input id="adminpassword" placeholder="Admin Password" type="password" required>
+        <input id="admincommand" placeholder="Admin command" type="text" autocomplete="off" required>
+        <input type="submit">
+      </form>
+
+      <br />
+      <button onclick="socket.emit('admin handler', adminpassword.value + 's lockall')">Lock</button>
+      <button onclick="socket.emit('admin handler', adminpassword.value + 's unlockall')">Unlock</button>
+      <button onclick="socket.emit('admin handler', adminpassword.value + 's refresh')">Refresh All Users
+        (Purge)</button>
+    </div>
+  </div>
+  <audio src="./notifi.wav" id="notification"></audio>
+  <audio src="./message.wav" id="messagesound"></audio>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const username = document.getElementById('username');
+    const messages = document.getElementById('messages');
+    const adminform = document.getElementById('adminform')
+    const admininput = document.getElementById('admincommand')
+    const adminpassword = document.getElementById('adminpassword')
+    const notification = document.getElementById('notification')
+    const messageNotifi = document.getElementById('messagesound')
+
+    var usercookie = localStorage.getItem('username');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminshow = urlParams.get('admin');
+
+    if (adminshow) {
+      document.getElementById('admin').style.display = "block";
+    }
+
+    if (usercookie) {
+      username.value = usercookie;
+      username.disabled = true;
+    }
+
+    adminform.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (admininput.value) {
+        socket.emit('admin handler', adminpassword.value + admininput.value);
+      }
+    })
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input.value) {
+        socket.emit('chat message', `${username.value}: ${input.value} ${adminpassword.value}`);
+        input.value = '';
+        if (!usercookie) {
+          localStorage.setItem('username', username.value);
+          username.disabled = true;
+        }
+      }
+    });
+    
+    const browserNotification = null;
+    
+    socket.on('chat message', (msg) => {
+      const item = document.createElement('li');
+      item.textContent = msg.message;
+      item.id = msg.msgid;
+      item.title = msg.msgid;
+      item.onclick = function (e) {
+        socket.emit('admin handler', adminpassword.value + `s removemsg ${msg.msgid}`);
+      }
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+      messageNotifi.play()
+    });
+    
+    socket.on('event', (msg) => {
+      const item = document.createElement('li');
+      item.style.color = 'blue';
+      const em = document.createElement('em');
+      em.appendChild(item);
+
+      item.innerHTML = msg;
+      messages.appendChild(em);
+      window.scrollTo(0, document.body.scrollHeight);
+      notification.play()
+    });
+
+    socket.on('reload', (msg) => {
+      location.reload()
+    });
+
+    socket.on('highlight', (msg) => {
+      const item = document.createElement('li');
+      item.classList.add('highlight')
+      item.textContent = msg;
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+      notification.play();
+    });
+
+    socket.on('opentab', (msg) => {
+      window.open(msg, '_blank');
+      console.log(msg);
+    });
+
+    socket.on('users', (msg) => {
+      document.getElementById('usersonline').innerHTML = msg;
+    });
+
+    socket.on('delete message', (msg) => {
+      document.getElementById(msg).remove();
+      console.log(msg);
+    })
+  </script>
+ 
+</body>
+</html>
