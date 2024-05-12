@@ -94,8 +94,7 @@
       <br />
       <button onclick="socket.emit('admin handler', adminpassword.value + 's lockall')">Lock</button>
       <button onclick="socket.emit('admin handler', adminpassword.value + 's unlockall')">Unlock</button>
-      <button onclick="socket.emit('admin handler', adminpassword.value + 's refresh')">Refresh All Users
-        (Purge)</button>
+      <button onclick="socket.emit('admin handler', adminpassword.value + 's purge')">Purge Messages</button>
     </div>
   </div>
   <audio src="./notifi.wav" id="notification"></audio>
@@ -193,17 +192,16 @@
     });
 
     socket.on('users', (msg) => {
-      if(parseInt(document.getElementById('usersonline').innerHTML) < parseInt(msg)){
-        document.getElementById("messages").innerHTML = ""
-      }
       document.getElementById('usersonline').innerHTML = msg;
-      
     });
 
     socket.on('delete message', (msg) => {
       document.getElementById(msg).remove();
       socket.emit("delete", msg)
       console.log(msg);
+    })
+    socket.on('clear', (msg) => {
+      document.getElementById("messages").innerHTML = ""
     })
   </script>
  

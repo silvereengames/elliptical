@@ -9,7 +9,7 @@ const { MongoClient } = require('mongodb');
 //database
 const client = new MongoClient('mongodb://127.0.0.1:27017');
 
-const db = client.db("eliptical");
+const db = client.db("elliptical");
 const chats = db.collection("chats");
 async function start() {
   try {
@@ -22,6 +22,7 @@ async function start() {
 }
 async function find(){
   let result = chats.find();
+  io.emit('clear', "")
   for await (const doc of result) {
     if(doc.msgid == "admin"){
       io.emit('highlight', doc.message);
@@ -79,6 +80,9 @@ function executeUserInput(input) {
       locked = false;
     } else if (input.substring(2) == 'refresh') {
       io.emit('reload', '');
+    } else if (input.substring(2) == 'purge') {
+      chats.deleteMany({})
+      io.emit('clear', "")
     } else if (input.substring(2).includes('opentab')) {
       const message = input.substring(10);
       io.emit('opentab', message)
