@@ -14,6 +14,7 @@ const chats = db.collection("chats");
 async function start() {
   try {
       await client.connect();
+      await chats.createIndex({ createdAt: 1 }, { expireAfterSeconds: expire*3600 });
       console.log('Connected to MongoDB');
   } catch (error) {
       console.error('Error connecting to MongoDB:', error);
@@ -32,6 +33,9 @@ async function find(){
 }
 start()
 
+//Time until messages expire from database if this causes an error try deleting the collection in mongodb
+const expire = 24
+
 const app = express();
 const converter = new showdown.Converter()
 const server = createServer(app);
@@ -40,6 +44,8 @@ var locked = true;
 var cooldown = 1000;
 var cooldownlocked = false;
 var active = 0;
+//Change
+const adminpassword = "changeme"
 
 
 const blockedTerms = [
@@ -52,8 +58,6 @@ const blockedTerms = [
   "penis"
 
 ];
-
-const adminpassword = "changeme"
 
 app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'index.html'));
@@ -92,6 +96,9 @@ io.on('connection', (socket) => {
   active++;
   io.emit('users', active);
   find();
+  socket.on('delete', (msgid)=>{
+    chats.deleteOne({msgid: msgid})
+  });
   socket.on('chat message', (msg) => {
     const filtermsgspace = msg.replaceAll(' ', '');
     const filtermsgcaps = filtermsgspace.toLowerCase();
@@ -108,7 +115,7 @@ io.on('connection', (socket) => {
       // Broadcast the message to others
       //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
       let idk = msg.replace(adminpassword, '')
-      chats.insertOne({message: idk, msgid: 'admin'})
+      chats.insertOne({message: idk, msgid: 'admin', createdAt: new Date()})
       io.emit('highlight', idk);
     } else {
       if (msg.length >= 200) {
@@ -117,8 +124,8 @@ io.on('connection', (socket) => {
         //const markdown = converter.makeHtml(msg);
         const itemidnum = Math.floor(Math.random() * 1000);
         const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
-        chats.insertOne({message: msg, msgid: messageid})
-        io.emit('chat message', { message: msg, msgid: messageid });
+        chats.insertOne({message: msg, msgid: messageid, createdAt: new Date()})
+        io.emit('chat message', { message: msg, msgid: messageid});
       }
     }
   });
