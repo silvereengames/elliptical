@@ -193,11 +193,16 @@
     });
 
     socket.on('users', (msg) => {
+      if(parseInt(document.getElementById('usersonline').innerHTML) < parseInt(msg)){
+        document.getElementById("messages").innerHTML = ""
+      }
       document.getElementById('usersonline').innerHTML = msg;
+      
     });
 
     socket.on('delete message', (msg) => {
       document.getElementById(msg).remove();
+      socket.emit("delete", msg)
       console.log(msg);
     })
   </script>
