@@ -4,6 +4,33 @@ const { join } = require('node:path');
 const { Server } = require('socket.io');
 const readline = require('readline');
 const showdown = require('showdown');
+const { MongoClient } = require('mongodb');
+
+//database
+const client = new MongoClient('mongodb://127.0.0.1:27017');
+
+const db = client.db("eliptical");
+const chats = db.collection("chats");
+async function start() {
+  try {
+      await client.connect();
+      console.log('Connected to MongoDB');
+  } catch (error) {
+      console.error('Error connecting to MongoDB:', error);
+  }
+}
+async function find(){
+  let result = chats.find();
+  for await (const doc of result) {
+    if(doc.msgid == "admin"){
+      io.emit('highlight', doc.message);
+    }
+    else{
+      io.emit('chat message', doc);
+    }
+  }
+}
+start()
 
 const app = express();
 const converter = new showdown.Converter()
@@ -26,7 +53,7 @@ const blockedTerms = [
 
 ];
 
-const adminpasswords = ""
+const adminpassword = "changeme"
 
 app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'index.html'));
@@ -64,6 +91,7 @@ io.on('connection', (socket) => {
   //io.emit('event', 'A user connected');
   active++;
   io.emit('users', active);
+  find();
   socket.on('chat message', (msg) => {
     const filtermsgspace = msg.replaceAll(' ', '');
     const filtermsgcaps = filtermsgspace.toLowerCase();
@@ -76,10 +104,12 @@ io.on('connection', (socket) => {
       socket.emit('event', "<span style='color:red;font-weight:800'>Error - Message not sent: You send a blocked word or phrase </span>");
     } else if (locked == true) {
       socket.emit('event', "<span style='color:red;font-weight:800'>Error - Chat is locked</span>");
-    } else if (msg.includes('adminpassword')) {
+    } else if (msg.includes(adminpassword)) {
       // Broadcast the message to others
       //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
-      io.emit('highlight', msg.replace('adminpassword', ''));
+      let idk = msg.replace(adminpassword, '')
+      chats.insertOne({message: idk, msgid: 'admin'})
+      io.emit('highlight', idk);
     } else {
       if (msg.length >= 200) {
         socket.emit('event', "<span style='color:red;font-weight:800'>Error - Message not sent: Message above 200 charcters</span>");
@@ -87,6 +117,7 @@ io.on('connection', (socket) => {
         //const markdown = converter.makeHtml(msg);
         const itemidnum = Math.floor(Math.random() * 1000);
         const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
+        chats.insertOne({message: msg, msgid: messageid})
         io.emit('chat message', { message: msg, msgid: messageid });
       }
     }
@@ -98,8 +129,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('admin handler', (msg) => {
-    if (msg.includes('adminpassword')) {
-      executeUserInput(msg.replace('adminpassword', ''));
+    if (msg.includes(adminpassword)) {
+      executeUserInput(msg.replace(adminpassword, ''));
       //console.log(msg);
       //console.log(msg.replace('adminpassword', ''));
     }
