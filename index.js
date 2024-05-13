@@ -6,8 +6,14 @@ const readline = require('readline');
 const showdown = require('showdown');
 const { MongoClient } = require('mongodb');
 
+let client = null
 //database
-const client = new MongoClient('mongodb://127.0.0.1:27017');
+if(process.argv[2] == "Docker"){
+  client = new MongoClient('mongodb://mongodb:27017');
+}
+else{
+  client = new MongoClient('mongodb://127.0.0.1:27017');
+}
 
 const db = client.db("elliptical");
 const chats = db.collection("chats");

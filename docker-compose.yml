@@ -1,0 +1,13 @@
+services:
+  elliptical:
+    restart: always
+    build:
+      context: ./
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+
+  mongodb:
+    restart: always
+    image: mongo
