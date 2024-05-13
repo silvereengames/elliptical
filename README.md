@@ -1,6 +1,14 @@
 # elliptical
 The most simple socket.io web-based live chatting platform with simple moderation features
 
-Requires [mongodb](https://www.mongodb.com/docs/manual/administration/install-community/) to be installed
+## Requires
+- [Node.js](https://nodejs.org/)
+- [MongoDB](https://www.mongodb.com/docs/manual/administration/install-community/)
 
-Be sure to change the admin password
+## Start
+Replace admin-password with whatever you want the admin password to be
+```
+npm install
+node index.js admin-password
+```
+Open with admin options by going to `localhost:3030?admin=idk`

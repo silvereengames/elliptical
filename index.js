@@ -41,13 +41,15 @@ const app = express();
 const converter = new showdown.Converter()
 const server = createServer(app);
 const io = new Server(server);
-var locked = true;
+var locked = false;
 var cooldown = 1000;
 var cooldownlocked = false;
 var active = 0;
-//Change
-const adminpassword = "changeme"
-
+//default
+var adminpassword = "changeme"
+if(process.argv[2] != undefined){
+  adminpassword = process.argv[2];
+}
 
 const blockedTerms = [
   "cum",
