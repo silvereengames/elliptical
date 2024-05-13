@@ -11,17 +11,28 @@ const client = new MongoClient('mongodb://127.0.0.1:27017');
 
 const db = client.db("elliptical");
 const chats = db.collection("chats");
+const adminpass = db.collection("admin-password");
 async function start() {
   try {
       await client.connect();
       await chats.createIndex({ createdAt: 1 }, { expireAfterSeconds: expire*3600 });
       console.log('Connected to MongoDB');
+      password()
   } catch (error) {
       console.error('Error connecting to MongoDB:', error);
   }
 }
+async function password(){
+  let result = await adminpass.findOne({id: "admin"});
+  if(result == null){
+    adminpass.insertOne({id: "admin", password: adminpassword})
+  }
+  else{
+    adminpassword = result.password
+  }
+}
 async function find(){
-  let result = chats.find();
+  let result = await chats.find();
   io.emit('clear', "")
   for await (const doc of result) {
     if(doc.msgid == "admin"){
@@ -45,11 +56,7 @@ var locked = false;
 var cooldown = 1000;
 var cooldownlocked = false;
 var active = 0;
-//default
 var adminpassword = "changeme"
-if(process.argv[2] != undefined){
-  adminpassword = process.argv[2];
-}
 
 const blockedTerms = [
   "cum",
@@ -64,6 +71,14 @@ const blockedTerms = [
 
 app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'index.html'));
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(join(__dirname, 'admin.html'));
+});
+
+app.get('*', (req, res) => {
+  res.send("404")
 });
 
 app.use(express.static('public'))
@@ -86,14 +101,22 @@ function executeUserInput(input) {
       chats.deleteMany({})
       io.emit('clear', "")
     } else if (input.substring(2).includes('opentab')) {
-      const message = input.substring(10);
+      let message = input.substring(10);
       io.emit('opentab', message)
     } else if (input.substring(2).includes('removemsg')) {
-      const message = input.substring(12);
+      let message = input.substring(12);
       io.emit('delete message', message)
+    } else if (input.substring(2).includes('highlight')){
+      // Broadcast the message to others
+      //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
+      let message = input.substring(11);
+      chats.insertOne({message: message, msgid: 'admin', createdAt: new Date()})
+      io.emit('highlight', message);
+    } else{
+      console.log("Invalid Command")
     }
-  } else {
-    console.log('Invalid command');
+  } else{
+    console.log("Invalid Command")
   }
 }
 
@@ -117,12 +140,6 @@ io.on('connection', (socket) => {
       socket.emit('event', "<span style='color:red;font-weight:800'>Error - Message not sent: You send a blocked word or phrase </span>");
     } else if (locked == true) {
       socket.emit('event', "<span style='color:red;font-weight:800'>Error - Chat is locked</span>");
-    } else if (msg.includes(adminpassword)) {
-      // Broadcast the message to others
-      //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
-      let idk = msg.replace(adminpassword, '')
-      chats.insertOne({message: idk, msgid: 'admin', createdAt: new Date()})
-      io.emit('highlight', idk);
     } else {
       if (msg.length >= 200) {
         socket.emit('event', "<span style='color:red;font-weight:800'>Error - Message not sent: Message above 200 charcters</span>");
@@ -146,6 +163,19 @@ io.on('connection', (socket) => {
       executeUserInput(msg.replace(adminpassword, ''));
       //console.log(msg);
       //console.log(msg.replace('adminpassword', ''));
+    }
+    else{
+      console.log('Invalid Password');
+    }
+  })
+  socket.on('passchange', (msg) => {
+    if (msg.includes(adminpassword)) {
+      newpass = msg.replace(adminpassword, '')
+      adminpass.updateOne({id:"admin"}, {$set:{password: newpass}})
+      adminpassword = newpass
+    }
+    else{
+      console.log("Invalid Password")
     }
   })
 });

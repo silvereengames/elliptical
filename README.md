@@ -6,9 +6,8 @@ The most simple socket.io web-based live chatting platform with simple moderatio
 - [MongoDB](https://www.mongodb.com/docs/manual/administration/install-community/)
 
 ## Start
-Replace admin-password with whatever you want the admin password to be
 ```
 npm install
-node index.js admin-password
+node index.js
 ```
-Open with admin options by going to `localhost:3000?admin=idk`
+Open with admin options by going to `localhost:3000/admin`
