@@ -37,22 +37,22 @@ async function password(){
     adminpassword = result.password
   }
 }
-async function find(){
+async function find(socket){
+  socket.emit('clear', "")
   let result = await chats.find();
-  io.emit('clear', "")
   for await (const doc of result) {
     if(doc.msgid == "admin"){
-      io.emit('highlight', doc.message);
+      socket.emit('highlight', doc.message);
     }
     else{
-      io.emit('chat message', doc);
+      socket.emit('chat message', doc);
     }
   }
 }
 start()
 
 //Time until messages expire from database if this causes an error try deleting the collection in mongodb
-const expire = 24
+const expire = 1
 
 const app = express();
 const converter = new showdown.Converter()
@@ -71,7 +71,8 @@ const blockedTerms = [
   "nigger",
   "nigga",
   "rape",
-  "penis"
+  "penis",
+  "dick"
 
 ];
 
@@ -111,6 +112,7 @@ function executeUserInput(input) {
       io.emit('opentab', message)
     } else if (input.substring(2).includes('removemsg')) {
       let message = input.substring(12);
+      chats.deleteOne({msgid: message})
       io.emit('delete message', message)
     } else if (input.substring(2).includes('highlight')){
       // Broadcast the message to others
@@ -130,10 +132,7 @@ io.on('connection', (socket) => {
   //io.emit('event', 'A user connected');
   active++;
   io.emit('users', active);
-  find();
-  socket.on('delete', (msgid)=>{
-    chats.deleteOne({msgid: msgid})
-  });
+  find(socket);
   socket.on('chat message', (msg) => {
     const filtermsgspace = msg.replaceAll(' ', '');
     const filtermsgcaps = filtermsgspace.toLowerCase();
@@ -179,6 +178,8 @@ io.on('connection', (socket) => {
       newpass = msg.replace(adminpassword, '')
       adminpass.updateOne({id:"admin"}, {$set:{password: newpass}})
       adminpassword = newpass
+      socket.emit('event', "<span style='color:green;font-weight:800'>Password Change Successful</span>");
+
     }
     else{
       console.log("Invalid Password")
