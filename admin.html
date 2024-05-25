@@ -96,7 +96,7 @@
       <button onclick="socket.emit('admin handler', adminpassword.value + 's lockall')">Lock</button>
       <button onclick="socket.emit('admin handler', adminpassword.value + 's unlockall')">Unlock</button>
       <button onclick="socket.emit('admin handler', adminpassword.value + 's purge')">Purge Messages</button>
-      <button onclick="socket.emit('admin handler', adminpassword.value + 's highlight' + admininput.value)">Highlight Message</button>
+      <button onclick="socket.emit('admin handler', adminpassword.value + 's highlight' + `${username.value} ${admininput.value}`)">Highlight Message</button>
       <button onclick="socket.emit('passchange', adminpassword.value + admininput.value)">Change Password</button>
 
       <p>Default password is <span style="color: rgb(0, 140, 255);">changeme</span>
@@ -198,7 +198,6 @@
 
     socket.on('delete message', (msg) => {
       document.getElementById(msg).remove();
-      socket.emit("delete", msg)
       console.log(msg);
     })
     socket.on('clear', (msg) => {

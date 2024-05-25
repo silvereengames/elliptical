@@ -165,8 +165,6 @@
 
     socket.on('delete message', (msg) => {
       document.getElementById(msg).remove();
-      socket.emit("delete", msg)
-      console.log(msg);
     })
     socket.on('clear', (msg) => {
       document.getElementById("messages").innerHTML = ""
