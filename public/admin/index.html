@@ -75,15 +75,42 @@
   <div class="main">
     <h1>Elliptical - Chatting Platform</h1>
     <p>Version 0.15 - Prerelease</p>
-    <h3 class="sticky" style="background-color: #1a1a1a; display: inline;">Their are <span id="usersonline"></span> users online currently</h3>
+    <h3 class="sticky" style="background-color: #1a1a1a; display: inline;">Their are <span id="usersonline"></span>
+      users online currently</h3>
     </h3>
     <br>
     <ul id="messages"></ul>
     <form id="form" action="">
       <input id="username" placeholder="Username" class="messageform" required />
       <input id="input" autocomplete="off" placeholder="Message" required class="messageform" />
-      <button class="shadow__btn" class="messageform" >Send</button>
+      <button class="shadow__btn" class="messageform">Send</button>
     </form>
+    <div id="admin" style="display: block;">
+      <form id="adminform" action="">
+        <input id="adminpassword" placeholder="Admin Password" type="password" required>
+        <input id="admincommand" placeholder="Admin command" type="text" autocomplete="off" required>
+        <input type="submit">
+      </form>
+
+      <br />
+      <h2>Quick Access</h2>
+      <button onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'lockall'})">Lock</button>
+      <button
+        onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'unlockall'})">Unlock</button>
+      <button onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'purge'})">Purge
+        Messages</button>
+      <button
+        onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'highlight', data: `${username.value} ${admininput.value}`})">Highlight
+        Message</button>
+      <button onclick="socket.emit('passchange',{ adminpass: adminpassword.value, newpass: admininput.value})">Change
+        Password</button>
+
+      <p>Default password is <span style="color: rgb(0, 140, 255);">changeme</span>
+        to change the password enter the current admin password into <span style="color: rgb(0, 140, 255);">Admin
+          Password</span>
+        put the new one in <span style="color: rgb(0, 140, 255);">Admin command</span>
+        then click <span style="color: rgb(0, 140, 255);">Change Password</span></p>
+    </div>
   </div>
   <audio src="./notifi.wav" id="notification"></audio>
   <audio src="./message.wav" id="messagesound"></audio>
@@ -95,6 +122,9 @@
     const input = document.getElementById('input');
     const username = document.getElementById('username');
     const messages = document.getElementById('messages');
+    const adminform = document.getElementById('adminform')
+    const admininput = document.getElementById('admincommand')
+    const adminpassword = document.getElementById('adminpassword')
     const notification = document.getElementById('notification')
     const messageNotifi = document.getElementById('messagesound')
 
@@ -104,6 +134,13 @@
       username.value = usercookie;
       username.disabled = true;
     }
+
+    adminform.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (admininput.value) {
+        socket.emit('admin handler',{adminpass: adminpassword.value, command: admininput.value});
+      }
+    })
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -116,19 +153,22 @@
         }
       }
     });
-    
+
     const browserNotification = null;
-    
+
     socket.on('chat message', (msg) => {
       const item = document.createElement('li');
       item.textContent = msg.message;
       item.id = msg.msgid;
       item.title = msg.msgid;
+      item.onclick = function (e) {
+        socket.emit('admin handler', { adminpass: adminpassword.value, command: "removemsg", data: msg.msgid});
+      }
       messages.appendChild(item);
       window.scrollTo(0, document.body.scrollHeight);
       messageNotifi.play()
     });
-    
+
     socket.on('event', (msg) => {
       const item = document.createElement('li');
       item.style.color = 'blue';
@@ -165,11 +205,13 @@
 
     socket.on('delete message', (msg) => {
       document.getElementById(msg).remove();
+      console.log(msg);
     })
     socket.on('clear', (msg) => {
       document.getElementById("messages").innerHTML = ""
     })
   </script>
- 
+
 </body>
+
 </html>
