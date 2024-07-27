@@ -75,14 +75,19 @@
   <div class="main">
     <h1>Elliptical - Chatting Platform</h1>
     <p>Version 0.15 - Prerelease</p>
-    <h3 class="sticky" style="background-color: #1a1a1a; display: inline;">Their are <span id="usersonline"></span> users online currently</h3>
+    <h3 class="sticky" style="background-color: #1a1a1a; display: inline;">Their are <span id="usersonline"></span>
+      users online currently</h3>
     </h3>
+    <br>
+    <h3 id="header1">Rooms</h3>
+    <h3 style="display: none;" id="header2">Chats</h3>
     <br>
     <ul id="messages"></ul>
     <form id="form" action="">
       <input id="username" placeholder="Username" class="messageform" required />
       <input id="input" autocomplete="off" placeholder="Message" required class="messageform" />
-      <button class="shadow__btn" class="messageform" >Send</button>
+      <button class="shadow__btn" class="messageform" style="display: none;" id="send">Send</button>
+      <button class="shadow__btn" class="messageform" id="createroom">Create Room</button>
     </form>
   </div>
   <audio src="./notifi.wav" id="notification"></audio>
@@ -99,6 +104,8 @@
     const messageNotifi = document.getElementById('messagesound')
 
     var user = localStorage.getItem('username');
+    var roomsel = true;
+    var roomid = null;
 
     if (user) {
       username.value = user;
@@ -108,7 +115,11 @@
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (input.value) {
-        socket.emit('chat message', `${username.value}: ${input.value}`);
+        if (!roomsel) {
+          socket.emit('chat message', { msg: `${username.value}: ${input.value}`, roomid: roomid });
+        } else {
+          socket.emit('room', input.value);
+        }
         input.value = '';
         if (!user) {
           localStorage.setItem('username', username.value);
@@ -116,9 +127,31 @@
         }
       }
     });
-    
-    const browserNotification = null;
-    
+
+    // const browserNotification = null;
+
+    socket.on('room', (room) => {
+      const item = document.createElement('li');
+      item.textContent = room.title;
+      item.id = room.roomid;
+      item.title = room.roomid;
+      item.onclick = function (e) {
+        socket.emit('joinroom', room.roomid);
+      }
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+      // messageNotifi.play()
+    });
+
+    socket.on('joined', (id) => {
+      roomsel = false;
+      roomid = id;
+      document.getElementById('header2').style.display = 'inline';
+      document.getElementById('send').style.display = 'inline';
+      document.getElementById('header1').style.display = 'none';
+      document.getElementById('createroom').style.display = 'none';
+    })
+
     socket.on('chat message', (msg) => {
       const item = document.createElement('li');
       item.textContent = msg.message;
@@ -128,7 +161,7 @@
       window.scrollTo(0, document.body.scrollHeight);
       messageNotifi.play()
     });
-    
+
     socket.on('event', (msg) => {
       const item = document.createElement('li');
       item.style.color = 'blue';
@@ -148,7 +181,17 @@
     socket.on('highlight', (msg) => {
       const item = document.createElement('li');
       item.classList.add('highlight')
-      item.textContent = msg;
+      if (msg.roomid) {
+        item.textContent = msg.title;
+        item.id = msg.roomid;
+        item.onclick = function (e) {
+          socket.emit('joinroom', msg.roomid);
+        }
+      } else {
+        item.textContent = msg.message;
+        item.id = msg.msgid;
+        item.title = msg.msgid;
+      }
       messages.appendChild(item);
       window.scrollTo(0, document.body.scrollHeight);
       notification.play();
@@ -170,6 +213,7 @@
       document.getElementById("messages").innerHTML = ""
     })
   </script>
- 
+
 </body>
+
 </html>

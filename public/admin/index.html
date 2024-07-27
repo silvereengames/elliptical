@@ -79,11 +79,15 @@
       users online currently</h3>
     </h3>
     <br>
+    <h3 id="header1">Rooms</h3>
+    <h3 style="display: none;" id="header2">Chats</h3>
+    <br>
     <ul id="messages"></ul>
     <form id="form" action="">
       <input id="username" placeholder="Username" class="messageform" required />
       <input id="input" autocomplete="off" placeholder="Message" required class="messageform" />
-      <button class="shadow__btn" class="messageform">Send</button>
+      <button class="shadow__btn" class="messageform" style="display: none;" id="send">Send</button>
+      <button class="shadow__btn" class="messageform" id="createroom">Create Room</button>
     </form>
     <div id="admin" style="display: block;">
       <form id="adminform" action="">
@@ -92,15 +96,17 @@
         <input type="submit">
       </form>
 
+      <p>Highlight submits from the <span style="color: rgb(0, 140, 255);">Admin command </span>box</p>
+
       <br />
       <h2>Quick Access</h2>
       <button onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'lockall'})">Lock</button>
       <button
         onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'unlockall'})">Unlock</button>
       <button onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'purge'})">Purge
-        Messages</button>
+        All Rooms</button>
       <button
-        onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'highlight', data: `${username.value} ${admininput.value}`})">Highlight
+        onclick="socket.emit('admin handler',{ adminpass: adminpassword.value, command: 'highlight', roomid: roomid, data: {username: username.value, message: admininput.value}})">Highlight
         Message</button>
       <button onclick="socket.emit('passchange',{ adminpass: adminpassword.value, newpass: admininput.value})">Change
         Password</button>
@@ -128,42 +134,82 @@
     const notification = document.getElementById('notification')
     const messageNotifi = document.getElementById('messagesound')
 
-    var usercookie = localStorage.getItem('username');
+    var user = localStorage.getItem('username');
+    var roomsel = true;
+    var roomid = null;
 
-    if (usercookie) {
-      username.value = usercookie;
+    if (user) {
+      username.value = user;
       username.disabled = true;
     }
 
     adminform.addEventListener('submit', (e) => {
       e.preventDefault();
       if (admininput.value) {
-        socket.emit('admin handler',{adminpass: adminpassword.value, command: admininput.value});
+        socket.emit('admin handler', { adminpass: adminpassword.value, command: admininput.value });
       }
     })
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (input.value) {
-        socket.emit('chat message', `${username.value}: ${input.value}`);
+        if (!roomsel) {
+          socket.emit('chat message', { msg: `${username.value}: ${input.value}`, roomid: roomid });
+        } else {
+          socket.emit('room', input.value);
+        }
         input.value = '';
-        if (!usercookie) {
+        if (!user) {
           localStorage.setItem('username', username.value);
           username.disabled = true;
         }
       }
     });
 
-    const browserNotification = null;
+    // const browserNotification = null;
+
+    socket.on('room', (room) => {
+      const idk = document.createElement('div');
+      idk.style = 'display: flex; justify-content: center;';
+      const item = document.createElement('li');
+      const button = document.createElement("button");
+      button.textContent = "delete";
+      button.onclick = function (e) {
+        socket.emit('admin handler', { adminpass: adminpassword.value, command: "deleteroom", roomid: room.roomid });
+      }
+      item.textContent = room.title;
+      idk.id = room.roomid;
+      idk.title = room.roomid;
+      idk.appendChild(item);
+      idk.appendChild(button);
+      item.onclick = function (e) {
+        socket.emit('joinroom', room.roomid);
+      }
+      messages.appendChild(idk);
+      window.scrollTo(0, document.body.scrollHeight);
+      // messageNotifi.play()
+    });
+
+    socket.on('joined', (id) => {
+      roomsel = false;
+      roomid = id;
+      document.getElementById('header2').style.display = 'inline';
+      document.getElementById('send').style.display = 'inline';
+      document.getElementById('header1').style.display = 'none';
+      document.getElementById('createroom').style.display = 'none';
+    })
 
     socket.on('chat message', (msg) => {
       const item = document.createElement('li');
+      const button = document.createElement("button");
+      button.textContent = "delete";
+      button.onclick = function (e) {
+        socket.emit('admin handler', { adminpass: adminpassword.value, command: "removemsg", msgid: msg.msgid, roomid: roomid });
+      }
       item.textContent = msg.message;
       item.id = msg.msgid;
       item.title = msg.msgid;
-      item.onclick = function (e) {
-        socket.emit('admin handler', { adminpass: adminpassword.value, command: "removemsg", data: msg.msgid});
-      }
+      item.appendChild(button);
       messages.appendChild(item);
       window.scrollTo(0, document.body.scrollHeight);
       messageNotifi.play()
@@ -186,10 +232,38 @@
     });
 
     socket.on('highlight', (msg) => {
+      console.log(msg)
+
+      const idk = document.createElement('div');
       const item = document.createElement('li');
-      item.classList.add('highlight')
-      item.textContent = msg;
-      messages.appendChild(item);
+      const button = document.createElement("button");
+      idk.style = 'display: flex; justify-content: center;';
+      button.textContent = "delete";
+      if (msg.roomid) {
+        item.textContent = msg.title;
+        idk.classList.add('highlight')
+        idk.id = msg.roomid;
+        idk.title = msg.roomid;
+        item.onclick = function (e) {
+          socket.emit('joinroom', msg.roomid);
+        }
+        button.onclick = function (e) {
+          socket.emit('admin handler', { adminpass: adminpassword.value, command: "deleteroom", roomid: msg.roomid });
+        }
+        idk.appendChild(item);
+        idk.appendChild(button);
+        messages.appendChild(idk);
+      } else {
+        item.classList.add('highlight')
+        item.textContent = msg.message;
+        item.id = msg.msgid;
+        item.title = msg.msgid;
+        button.onclick = function (e) {
+          socket.emit('admin handler', { adminpass: adminpassword.value, command: "removemsg", roomid: roomid, msgid: msg.msgid });
+        }
+        item.appendChild(button);
+        messages.appendChild(item);
+      }
       window.scrollTo(0, document.body.scrollHeight);
       notification.play();
     });
