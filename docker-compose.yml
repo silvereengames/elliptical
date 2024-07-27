@@ -11,3 +11,7 @@ services:
   mongodb:
     restart: always
     image: mongo
+    volumes:
+      - mongodb:/usr/src/app
+volumes:
+  mongodb:
