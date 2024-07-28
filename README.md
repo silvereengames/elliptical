@@ -27,6 +27,8 @@ node index.js
 Open with admin options by going to `localhost:3000/admin`
 
 ## Todo
-[ ] Re-do the css
-[ ] Ability to make public and private rooms
-[ ] Limit the amount of public and private rooms a user can create on the admin dashboard
+- [ ] Re-do the css
+
+- [ ] Ability to make public and private rooms
+
+- [ ] Limit the amount of public and private rooms a user can create on the admin dashboard
