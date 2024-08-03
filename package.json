@@ -1,11 +1,11 @@
 {
-  "name": "amazing-chat",
+  "name": "elliptical",
   "version": "1.0.0",
-  "description": "",
+  "description": "The most simple socket.io web-based live chatting platform with simple moderation features",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "cd public && npm install && npm run build && cd .. && node index.js"
   },
   "author": "",
   "license": "ISC",
