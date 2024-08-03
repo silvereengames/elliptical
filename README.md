@@ -14,7 +14,7 @@ sudo docker compose up -d
 ### Terminal:
 **Prerequisites:**
 - [Node.js](https://nodejs.org/)
-- [MongoDB](https://www.mongodb.com/docs/manual/administration/install-community/)
+- [MongoDB](https://www.mongodb.com/try/download/community-edition)
 ### Start
 ```
 git clone https://github.com/silvereengames/elliptical.git
