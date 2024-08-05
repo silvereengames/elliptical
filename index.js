@@ -30,7 +30,13 @@ async function start() {
 const expire = 1; //Time until messages expire from database in hours(I think) if this causes an error try deleting the collection in mongodb
 const app = express();
 const server = createServer(app);
-const io = new Server(server);
+// const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173"
+  }
+});
+
 var locked = false;
 var cooldown = 1000;
 var cooldownlocked = false;
@@ -41,7 +47,7 @@ const blockedTerms = ["example"];
 
 start();
 
-app.use(express.static("public/dist"));
+app.use(express.static('dist'));
 
 app.get("*", (req, res) => {
   res.send("404");
@@ -69,17 +75,22 @@ async function getroom(socket) {
 }
 
 async function get(socket, id) {
-  socket.emit("clear", "");
-  let room = await rooms.findOne({ roomid: id });
-  let msg = room.messages;
-  if (msg !== undefined) {
-    for (const doc of msg) {
-      if (doc.data === "highlight") {
-        socket.emit("highlight", doc);
-      } else {
-        socket.emit("chat message", doc);
+  try {
+    socket.emit("clearmessages", "");
+    let room = await rooms.findOne({ roomid: id });
+    let msg = room.messages;
+    if (msg !== undefined) {
+      for (const doc of msg) {
+        if (doc.data === "highlight") {
+          socket.emit("highlight", doc);
+        } else {
+          socket.emit("chat message", doc);
+        }
       }
     }
+  } catch (error) {
+    console.warn(error);
+
   }
 }
 
@@ -102,7 +113,7 @@ async function executeUserInput(input) {
     io.emit("reload", "");
   } else if (commmand == "eval") {
     console.log("running eval")
-    eval(input  + "()");
+    eval(input + "()");
   } else if (command.includes("opentab")) {
     let message = command.substring(7);
     io.emit("opentab", message);
@@ -135,7 +146,7 @@ io.on("connection", async (socket) => {
   //io.emit('event', 'A user connected');
   socket.join("home");
   active++;
-  socket.emit("users", active);
+  io.emit("users", active);
   console.log(active)
   getroom(socket);
   // get(socket);
@@ -201,7 +212,7 @@ io.on("connection", async (socket) => {
       socket.emit("joined", id);
       get(socket, id);
     } catch (error) {
-      console.error(error);
+      console.warn(error);
     }
   });
 

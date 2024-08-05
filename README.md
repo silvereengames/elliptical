@@ -20,6 +20,7 @@ sudo docker compose up -d
 git clone https://github.com/silvereengames/elliptical.git
 cd elliptical
 npm install
+npm run build
 node index.js
 ```
 
