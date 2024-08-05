@@ -4,6 +4,8 @@ import { Server } from "socket.io";
 import { createInterface } from "readline";
 import { MongoClient } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 let client = null;
 //database
@@ -49,8 +51,11 @@ start();
 
 app.use(express.static('dist'));
 
-app.get("*", (req, res) => {
-  res.send("404");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.get('*', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
 });
 
 async function password() {
@@ -95,49 +100,53 @@ async function get(socket, id) {
 }
 
 async function executeUserInput(input) {
-  let command = input.command;
-  if (command.charAt(0) === "m") {
-    io.emit("event", `<span style='color:red;font-weight:800'>Server: ${command.substring(2)}</span>`);
-  } else if (command == "lockall") {
-    console.log("Locking all");
-    io.emit("event", "Chat has been locked");
-    locked = true;
-  } else if (command == "unlockall") {
-    console.log("Unlocking all");
-    io.emit("event", "Chat has been unlocked");
-    locked = false;
-  } else if (command == "refresh") {
-    io.emit("reload", "");
-  } else if (command == "purge") {
-    rooms.deleteMany({});
-    io.emit("reload", "");
-  } else if (commmand == "eval") {
-    console.log("running eval")
-    eval(input + "()");
-  } else if (command.includes("opentab")) {
-    let message = command.substring(7);
-    io.emit("opentab", message);
-  } else if (command == "removemsg") {
-    await rooms.updateOne({ roomid: input.roomid }, { $pull: { messages: { msgid: input.msgid } } });
-    io.to(input.roomid).emit("delete message", input.msgid);
-  } else if (command == "deleteroom") {
-    await rooms.deleteOne({ roomid: input.roomid });
-    io.to(input.roomid).emit("reload", "");
-    io.to("home").emit("delete message", input.roomid);
-  } else if (command == "highlight") {
-    // Broadcast the message to others
-    //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
-    let message = input.data.username + ": " + input.data.message;
-    let id = uuidv4();
-    if (input.roomid !== null) {
-      await rooms.updateOne({ roomid: input.roomid }, { $push: { messages: { message: message, msgid: id, data: "highlight" } } });
-      io.to(input.roomid).emit("highlight", { message: message, msgid: id, data: "highlight" });
+  try {
+    let command = input.command;
+    if (command.charAt(0) === "m") {
+      io.emit("event", `<span style='color:red;font-weight:800'>Server: ${command.substring(2)}</span>`);
+    } else if (command == "lockall") {
+      console.log("Locking all");
+      io.emit("event", "Chat has been locked");
+      locked = true;
+    } else if (command == "unlockall") {
+      console.log("Unlocking all");
+      io.emit("event", "Chat has been unlocked");
+      locked = false;
+    } else if (command == "refresh") {
+      io.emit("reload", "");
+    } else if (command == "purge") {
+      rooms.deleteMany({});
+      io.emit("reload", "");
+    } else if (command == "eval") {
+      console.log("running eval")
+      eval(input + "()");
+    } else if (command.includes("opentab")) {
+      let message = command.substring(7);
+      io.emit("opentab", message);
+    } else if (command == "deletemsg") {
+      await rooms.updateOne({ roomid: input.roomid }, { $pull: { messages: { msgid: input.msgid } } });
+      io.to(input.roomid).emit("deletemsg", input.msgid);
+    } else if (command == "deleteroom") {
+      await rooms.deleteOne({ roomid: input.roomid });
+      io.to(input.roomid).emit("reload", "");
+      io.to("home").emit("deleteroom", input.roomid);
+    } else if (command == "highlight") {
+      // Broadcast the message to others
+      //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
+      let message = input.data.username + ": " + input.data.message;
+      let id = uuidv4();
+      if (input.roomid !== null) {
+        await rooms.updateOne({ roomid: input.roomid }, { $push: { messages: { message: message, msgid: id, data: "highlight" } } });
+        io.to(input.roomid).emit("highlight", { message: message, msgid: id, data: "highlight" });
+      } else {
+        await rooms.insertOne({ title: input.data.message, roomid: id, data: "highlight" });
+        io.to("home").emit("highlight", { title: input.data.message, data: "highlight", roomid: id });
+      }
     } else {
-      await rooms.insertOne({ title: input.data.message, roomid: id, data: "highlight" });
-      io.to("home").emit("highlight", { title: input.data.message, data: "highlight", roomid: id });
+      console.log("Invalid Command");
     }
-  } else {
-    console.log("Invalid Command");
+  } catch (error) {
+    console.warn(error);
   }
 }
 
