@@ -32,12 +32,12 @@ async function start() {
 const expire = 1; //Time until messages expire from database in hours(I think) if this causes an error try deleting the collection in mongodb
 const app = express();
 const server = createServer(app);
-// const io = new Server(server);
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173"
-  }
-});
+const io = new Server(server);
+// const io = new Server(server, {
+//   cors: {
+//     origin: "http://localhost:5173"
+//   }
+// });
 
 var locked = false;
 var cooldown = 1000;
