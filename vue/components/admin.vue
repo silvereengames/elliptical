@@ -1,5 +1,4 @@
 <script setup>
-import { reactive } from "vue";
 import { socket } from '@/socket';
 import { stuff } from "@/store";
 
