@@ -236,7 +236,7 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("admin handler", (msg) => {
-    if (msg.adminpass.includes(adminpassword)) {
+    if (msg.adminpass === adminpassword) {
       executeUserInput(msg);
       //console.log(msg);
       //console.log(msg.replace('adminpassword', ''));
@@ -246,7 +246,7 @@ io.on("connection", async (socket) => {
   });
   socket.on("passchange", (msg) => {
     console.log(adminpassword)
-    if (msg.adminpass.includes(adminpassword)) {
+    if (msg.adminpass === adminpassword) {
       adminpass.updateOne({ id: "admin" }, { $set: { password: sanitize(msg.newpass) } });
       adminpassword = msg.newpass;
       socket.emit("event", "<span style='color:green;font-weight:800'>Password changed successfully!</span>");
@@ -257,7 +257,7 @@ io.on("connection", async (socket) => {
     }
   });
   socket.on("updateMaxRooms", (msg) => {
-    if (msg.adminpass.includes(adminpassword)) {
+    if (msg.adminpass === adminpassword) {
       MAX_ROOMS = msg.maxRooms;
       socket.emit("event", "<span style='color:green;font-weight:800'>Max rooms updated successfully!</span>");
       console.log("✅ Max rooms updated to: " + MAX_ROOMS);
