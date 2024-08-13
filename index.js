@@ -22,10 +22,10 @@ async function start() {
   try {
     await client.connect();
     // await chats.createIndex({ createdAt: 1 }, { expireAfterSeconds: expire * 3600 });
-    console.log("Connected to MongoDB");
+    console.log("✅ Connected to MongoDB!");
     password();
   } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
+    console.error("❌ Error connecting to MongoDB:", error);
   }
 }
 
@@ -94,7 +94,7 @@ async function get(socket, id) {
       }
     }
   } catch (error) {
-    console.warn(error);
+    console.warn("❌ Error! " + error);
 
   }
 }
@@ -105,12 +105,12 @@ async function executeUserInput(input) {
     if (command.charAt(0) === "m") {
       io.emit("event", `<span style='color:red;font-weight:800'>Server: ${command.substring(2)}</span>`);
     } else if (command == "lockall") {
-      console.log("Locking all");
-      io.emit("event", "Chat has been locked");
+      console.log("🔒 All chats locked!");
+      io.emit("event", "🔒 Chat has been locked!");
       locked = true;
     } else if (command == "unlockall") {
-      console.log("Unlocking all");
-      io.emit("event", "Chat has been unlocked");
+      console.log("🔓 All chats unlocked!");
+      io.emit("event", "🔓 Chat has been unlocked!");
       locked = false;
     } else if (command == "refresh") {
       io.emit("reload", "");
@@ -118,7 +118,7 @@ async function executeUserInput(input) {
       rooms.deleteMany({});
       io.emit("reload", "");
     } else if (command == "eval") {
-      console.log("running eval")
+      console.log("🔁 Running eval...")
       eval(input + "()");
     } else if (command.includes("opentab")) {
       let message = command.substring(7);
@@ -143,20 +143,19 @@ async function executeUserInput(input) {
         io.to("home").emit("highlight", { title: input.data.message, data: "highlight", roomid: id });
       }
     } else {
-      console.log("Invalid Command");
+      console.log("❌ Invalid command!");
     }
   } catch (error) {
-    console.warn(error);
+    console.warn("❌ Error! " + error);
   }
 }
 
 io.on("connection", async (socket) => {
-  console.log("a user connected " + socket.id);
+  console.log("📥 New user connected: " + socket.id);
   //io.emit('event', 'A user connected');
   socket.join("home");
   active++;
   io.emit("users", active);
-  console.log(active)
   getroom(socket);
   // get(socket);
   socket.on("chat message", async (message) => {
@@ -167,14 +166,14 @@ io.on("connection", async (socket) => {
     const messageIncludesBlockedTerm = blockedTerms.some((term) => filtermsgcaps.includes(term));
     if (messageIncludesBlockedTerm) {
       // Emit a warning or take other appropriate action
-      socket.emit("event", "<span style='color:red;font-weight:800'>Error - Message not sent: You send a blocked word or phrase </span>");
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to the active moderation rules.</span>");
     } else if (!regex.test(msg)) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Error - Message not sent: You send a blocked word or phrase </span>");
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to the active moderation rules.</span>");
     } else if (locked == true) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Error - Chat is locked</span>");
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to the chat being locked</span>");
     } else {
       if (msg.length >= 200) {
-        socket.emit("event", "<span style='color:red;font-weight:800'>Error - Message not sent: Message above 200 charcters</span>");
+        socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to it being longer than 200 characters</span>");
       } else {
         // const itemidnum = Math.floor(Math.random() * 1000);
         // const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
@@ -190,21 +189,21 @@ io.on("connection", async (socket) => {
     if (typeof msg === "string") {
       filtermsgspace = msg.replaceAll(" ", "");
     } else {
-      console.error("msg is not a string:", msg);
+      console.error("❌ msg is not a string:", msg);
     }
     const filtermsgcaps = filtermsgspace.toLowerCase();
     const regex = /^[ -~]*$/;
     const messageIncludesBlockedTerm = blockedTerms.some((term) => filtermsgcaps.includes(term));
     if (messageIncludesBlockedTerm) {
       // Emit a warning or take other appropriate action
-      socket.emit("event", "<span style='color:red;font-weight:800'>Error - Room not created: You sent a blocked word or phrase </span>");
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the active moderation rules!</span>");
     } else if (!regex.test(msg)) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Error - Room not created: You sent a blocked word or phrase </span>");
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the active moderation rules!</span>");
     } else if (locked == true) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Error - Chat is locked</span>");
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to chat being locked!</span>");
     } else {
-      if (msg.length >= 200) {
-        socket.emit("event", "<span style='color:red;font-weight:800'>Error - Room not created: Title above 200 charcters</span>");
+      if (msg.length >= 25) {
+        socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the name exceeding 25 characters</span>");
       } else {
         // const itemidnum = Math.floor(Math.random() * 1000);
         // const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
@@ -221,7 +220,7 @@ io.on("connection", async (socket) => {
       socket.emit("joined", id);
       get(socket, id);
     } catch (error) {
-      console.warn(error);
+      console.warn("❌ Error! " + error);
     }
   });
 
@@ -237,23 +236,25 @@ io.on("connection", async (socket) => {
       //console.log(msg);
       //console.log(msg.replace('adminpassword', ''));
     } else {
-      console.log("Invalid Password");
+      console.log("❌ Invalid admin password attempt: " + msg.adminpass);
     }
   });
   socket.on("passchange", (msg) => {
-    console.log(msg);
+    console.log(adminpassword)
     if (msg.adminpass.includes(adminpassword)) {
       adminpass.updateOne({ id: "admin" }, { $set: { password: msg.newpass } });
       adminpassword = msg.newpass;
-      socket.emit("event", "<span style='color:green;font-weight:800'>Password Change Successful</span>");
+      socket.emit("event", "<span style='color:green;font-weight:800'>Password changed successfully!</span>");
+      // console log new password
+      console.log("✅ Password changed to: " + msg.newpass);
     } else {
-      console.log("Invalid Password");
+      console.log("❌ Invalid admin password attempt: " + msg.adminpass);
     }
   });
 });
 
 server.listen(3000, () => {
-  console.log("server running at http://localhost:3000");
+  console.log("✅ Elliptical server running at http://localhost:3000");
 });
 
 const rl = createInterface({
@@ -262,7 +263,7 @@ const rl = createInterface({
 });
 
 function command() {
-  rl.question("Please type chat commands ", (input) => {
+  rl.question("✅ Ready for chat commands!\n", (input) => {
     executeUserInput({ command: input }); // Execute your function
     command();
   });
