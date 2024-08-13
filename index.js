@@ -126,7 +126,7 @@ async function executeUserInput(input) {
       await rooms.updateOne({ roomid: sanitize(input.roomid) }, { $pull: { messages: { msgid: sanitize(input.msgid) } } });
       io.to(input.roomid).emit("deletemsg", input.msgid);
     } else if (command == "deleteroom") {
-      await rooms.deleteOne({ roomid: input.roomid });
+      await rooms.deleteOne({ roomid: sanitize(input.roomid) });
       io.to(input.roomid).emit("reload", "");
       io.to("home").emit("deleteroom", input.roomid);
     } else if (command == "highlight") {
