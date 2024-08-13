@@ -15,6 +15,10 @@ function passchange() {
 function toggleSwitch() {
   stuff.delete = !stuff.delete;
 }
+
+function updateMaxRooms() {
+  socket.emit('updateMaxRooms', { adminpass: this.adminpass, maxRooms: this.maxRooms });
+}
 </script>
 
 <template>
@@ -28,6 +32,11 @@ function toggleSwitch() {
         <input class="m-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg" type="submit">
       </form>
     </div>
+    <div class="flex flex-col items-center">
+    <label>Max Rooms:</label>
+    <input v-model="maxRooms" type="number" min="1" class="p-2 border rounded" />
+    <button @click="updateMaxRooms" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg">Set Max Rooms</button>
+  </div>
     <p>Highlight submits from the <span style="color: rgb(0, 140, 255);">Admin command </span>box</p>
     <h2 class="text-xl">Quick Access:</h2>
     <div class="flex justify-center">
@@ -42,7 +51,7 @@ function toggleSwitch() {
       <button class="w-38 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="passchange()">Change
         Password</button>
       <div class="flex flex-col items-center">
-        <label>Delete Mode:</label>
+        <label>Zap Mode:</label>
         <span :class="{ 'bg-green-500': stuff.delete, 'bg-red-500': !stuff.delete }"
           class="relative inline-block w-12 h-6 rounded-full transition-colors duration-300 ease-in-out cursor-pointer"
           @click="toggleSwitch">

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { socket } from '@/socket';
 import { stuff } from "@/store";
 import admin from "@/components/admin.vue";
@@ -90,19 +90,25 @@ function onSubmit() {
     stuff.input = "";
   }
 }
+
 function promptUsername() {
   const username = prompt("Please enter your username");
   if (username) {
     stuff.username = username;
-    localStorage.setItem("username", username);
+  } else {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    stuff.username = `Guest ${randomNum}`;
   }
+  localStorage.setItem("username", stuff.username);
 }
+
 function promptRoom() {
   const roomTitle = prompt("Please enter a room name");
   if (roomTitle) {
     socket.emit("room", roomTitle);
   }
 }
+
 function joinRoom(room) {
   if (stuff.delete) {
     socket.emit('admin handler', { adminpass: stuff.adminpass, command: "deleteroom", roomid: room.roomid });
@@ -110,11 +116,22 @@ function joinRoom(room) {
     socket.emit("joinroom", room.roomid);
   }
 }
+
 function deletemsg(msgid) {
   if (stuff.delete) {
     socket.emit('admin handler', { adminpass: stuff.adminpass, command: "deletemsg", msgid: msgid, roomid: stuff.roomid });
   }
 }
+
+onMounted(() => {
+  let username = localStorage.getItem("username");
+  if (!username) {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    username = `Guest ${randomNum}`;
+    localStorage.setItem("username", username);
+  }
+  stuff.username = username;
+});
 </script>
 
 <template>
@@ -146,18 +163,22 @@ function deletemsg(msgid) {
         <p v-if="stuff.rooms.length === 0" class="mt-4 text-red-500">No active rooms. Please create one.</p>
       </div>
       <div v-if="stuff.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
-        <h3>Chats in {{ currentRoomTitle }}</h3>
+        <h3>Welcome to #{{ currentRoomTitle }}!</h3>
         <ul>
           <li v-for="(message, index) in stuff.messages" :key="index" v-html="message.msg"
             @click="deletemsg(message.id)"></li>
         </ul>
       </div>
+      <div v-else class="flex-1 p-4 rounded-lg flex flex-col items-center justify-center text-gray-400">
+        <h1>Welcome to Elliptical!</h1>
+        <h3>Select a room to start chatting...</h3>
+      </div>
     </div>
     <div class="p-4 mt-2 bg-gray-800 rounded-lg text-center" v-if="stuff.roomid">
-      <form @submit.prevent="onSubmit">
+      <form @submit.prevent="onSubmit" class="flex items-center">
         <input v-model="stuff.input" autocomplete="off" placeholder="Message" required
-          class="w-full p-3 bg-white text-black rounded-lg" />
-        <button class="w-full mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg">Send</button>
+          class="flex-grow p-3 bg-white text-black rounded-lg mr-2 h-10" />
+        <button class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg h-10">Send</button>
       </form>
     </div>
     <admin v-if="url === 'admin'" />
