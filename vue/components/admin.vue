@@ -42,7 +42,7 @@ function toggleSwitch() {
       <button class="w-38 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="passchange()">Change
         Password</button>
       <div class="flex flex-col items-center">
-        <label>Delete Mode:</label>
+        <label>Zap Mode:</label>
         <span :class="{ 'bg-green-500': stuff.delete, 'bg-red-500': !stuff.delete }"
           class="relative inline-block w-12 h-6 rounded-full transition-colors duration-300 ease-in-out cursor-pointer"
           @click="toggleSwitch">
