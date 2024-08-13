@@ -23,7 +23,7 @@ socket.on("joined", (id) => {
 });
 
 socket.on("chat message", (msg) => {
-  let html = `<p>${msg.message}</p>`;
+  let html = `<p>${sanitize(msg.message)}</p>`;
   stuff.messages.push({ id: msg.msgid, msg: html });
 });
 
@@ -74,6 +74,15 @@ const currentRoomTitle = computed(() => {
   const room = stuff.rooms.find((room) => room.roomid == stuff.roomid);
   return room ? room.title : "";
 })
+
+function sanitize(msg) {
+  return msg
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 function onSubmit() {
   if (stuff.input) {
