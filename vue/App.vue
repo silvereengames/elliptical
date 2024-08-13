@@ -137,18 +137,18 @@ function deletemsg(msgid) {
         <p v-if="stuff.rooms.length === 0" class="mt-4 text-red-500">No active rooms. Please create one.</p>
       </div>
       <div v-if="stuff.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
-        <h3>Chats in {{ currentRoomTitle }}</h3>
+        <h3>Welcome to #{{ currentRoomTitle }}!</h3>
         <ul>
           <li v-for="(message, index) in stuff.messages" :key="index" v-html="message.msg"
             @click="deletemsg(message.id)"></li>
         </ul>
       </div>
     </div>
-    <div class="p-4 mt-2 bg-gray-800 rounded-lg text-center" v-if="stuff.roomid">
-      <form @submit.prevent="onSubmit">
+        <div class="p-4 mt-2 bg-gray-800 rounded-lg text-center" v-if="stuff.roomid">
+      <form @submit.prevent="onSubmit" class="flex items-center">
         <input v-model="stuff.input" autocomplete="off" placeholder="Message" required
-          class="w-full p-3 bg-white text-black rounded-lg" />
-        <button class="w-full mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg">Send</button>
+          class="flex-grow p-3 bg-white text-black rounded-lg mr-2 h-10" />
+        <button class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg h-10">Send</button>
       </form>
     </div>
     <admin v-if="url === 'admin'" />
