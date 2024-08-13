@@ -44,6 +44,7 @@ var cooldown = 1000;
 var cooldownlocked = false;
 var active = 0;
 var adminpassword = "changeme";
+let MAX_ROOMS = 25; // default is 25
 
 const blockedTerms = ["example"];
 
@@ -194,19 +195,21 @@ io.on("connection", async (socket) => {
     const filtermsgcaps = filtermsgspace.toLowerCase();
     const regex = /^[ -~]*$/;
     const messageIncludesBlockedTerm = blockedTerms.some((term) => filtermsgcaps.includes(term));
+    
+    const roomCount = await rooms.countDocuments();
+  
     if (messageIncludesBlockedTerm) {
-      // Emit a warning or take other appropriate action
       socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the active moderation rules!</span>");
     } else if (!regex.test(msg)) {
       socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the active moderation rules!</span>");
     } else if (locked == true) {
       socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to chat being locked!</span>");
+    } else if (roomCount >= MAX_ROOMS) {
+      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the room limit!</span>");
     } else {
       if (msg.length >= 25) {
         socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the name exceeding 25 characters</span>");
       } else {
-        // const itemidnum = Math.floor(Math.random() * 1000);
-        // const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
         let roomid = uuidv4();
         await rooms.insertOne({ title: msg, roomid: roomid });
         io.to("home").emit("room", { title: msg, roomid: roomid });
@@ -247,6 +250,15 @@ io.on("connection", async (socket) => {
       socket.emit("event", "<span style='color:green;font-weight:800'>Password changed successfully!</span>");
       // console log new password
       console.log("✅ Password changed to: " + msg.newpass);
+    } else {
+      console.log("❌ Invalid admin password attempt: " + msg.adminpass);
+    }
+  });
+  socket.on("updateMaxRooms", (msg) => {
+    if (msg.adminpass.includes(adminpassword)) {
+      MAX_ROOMS = msg.maxRooms;
+      socket.emit("event", "<span style='color:green;font-weight:800'>Max rooms updated successfully!</span>");
+      console.log("✅ Max rooms updated to: " + MAX_ROOMS);
     } else {
       console.log("❌ Invalid admin password attempt: " + msg.adminpass);
     }
