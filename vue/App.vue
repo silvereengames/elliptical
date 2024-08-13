@@ -160,8 +160,12 @@ onMounted(() => {
             @click="deletemsg(message.id)"></li>
         </ul>
       </div>
+      <div v-else class="flex-1 p-4 rounded-lg flex flex-col items-center justify-center text-gray-400">
+        <h1>Welcome to Elliptical!</h1>
+        <h3>Select a room to start chatting...</h3>
+      </div>
     </div>
-        <div class="p-4 mt-2 bg-gray-800 rounded-lg text-center" v-if="stuff.roomid">
+    <div class="p-4 mt-2 bg-gray-800 rounded-lg text-center" v-if="stuff.roomid">
       <form @submit.prevent="onSubmit" class="flex items-center">
         <input v-model="stuff.input" autocomplete="off" placeholder="Message" required
           class="flex-grow p-3 bg-white text-black rounded-lg mr-2 h-10" />
