@@ -1,6 +1,9 @@
 <script setup>
+import { ref } from "vue";
 import { socket } from '@/socket';
 import { stuff } from "@/store";
+
+const maxRooms = ref(1);
 
 function adminhandler(cmd) {
   socket.emit('admin handler', { adminpass: stuff.adminpass, command: cmd })
@@ -17,7 +20,7 @@ function toggleSwitch() {
 }
 
 function updateMaxRooms() {
-  socket.emit('updateMaxRooms', { adminpass: this.adminpass, maxRooms: this.maxRooms });
+  socket.emit('updateMaxRooms', { adminpass: stuff.adminpass, maxRooms: maxRooms.value });
 }
 </script>
 
@@ -34,7 +37,7 @@ function updateMaxRooms() {
     </div>
     <div class="flex flex-col items-center">
     <label>Max Rooms:</label>
-    <input v-model="maxRooms" type="number" min="1" class="p-2 border rounded" />
+    <input v-model="maxRooms" type="number" min="1" class="p-2 border rounded text-black" />
     <button @click="updateMaxRooms" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg">Set Max Rooms</button>
   </div>
     <p>Highlight submits from the <span style="color: rgb(0, 140, 255);">Admin command </span>box</p>

@@ -162,16 +162,16 @@ onMounted(() => {
           Room</button>
         <p v-if="stuff.rooms.length === 0" class="mt-4 text-red-500">No active rooms. Please create one.</p>
       </div>
-      <div v-if="stuff.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
-        <h3>Welcome to #{{ currentRoomTitle }}!</h3>
+      <div class="flex-1 p-4 overflow-y-auto rounded-lg">
+        <div v-if="!stuff.roomid">
+          <h1>Welcome to Elliptical!</h1>
+          <h3>Select a room to start chatting...</h3>
+        </div>
+        <h3 v-else="stuff.roomid">Welcome to #{{ currentRoomTitle }}!</h3>
         <ul>
           <li v-for="(message, index) in stuff.messages" :key="index" v-html="message.msg"
             @click="deletemsg(message.id)"></li>
         </ul>
-      </div>
-      <div v-else class="flex-1 p-4 rounded-lg flex flex-col items-center justify-center text-gray-400">
-        <h1>Welcome to Elliptical!</h1>
-        <h3>Select a room to start chatting...</h3>
       </div>
     </div>
     <div class="p-4 mt-2 bg-gray-800 rounded-lg text-center" v-if="stuff.roomid">

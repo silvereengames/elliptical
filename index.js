@@ -6,6 +6,7 @@ import { MongoClient } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { sanitize } from "./mongo-sanitize.js";
 
 let client = null;
 //database
@@ -62,7 +63,7 @@ app.get('*', (req, res) => {
 async function password() {
   let result = await adminpass.findOne({ id: "admin" });
   if (result == null) {
-    adminpass.insertOne({ id: "admin", password: adminpassword });
+    adminpass.insertOne({ id: "admin", password: sanitize(adminpassword) });
   } else {
     adminpassword = result.password;
   }
@@ -83,7 +84,7 @@ async function getroom(socket) {
 async function get(socket, id) {
   try {
     socket.emit("clearmessages", "");
-    let room = await rooms.findOne({ roomid: id });
+    let room = await rooms.findOne({ roomid: sanitize(id) });
     let msg = room.messages;
     if (msg !== undefined) {
       for (const doc of msg) {
@@ -118,14 +119,11 @@ async function executeUserInput(input) {
     } else if (command == "purge") {
       rooms.deleteMany({});
       io.emit("reload", "");
-    } else if (command == "eval") {
-      console.log("🔁 Running eval...")
-      eval(input + "()");
     } else if (command.includes("opentab")) {
       let message = command.substring(7);
       io.emit("opentab", message);
     } else if (command == "deletemsg") {
-      await rooms.updateOne({ roomid: input.roomid }, { $pull: { messages: { msgid: input.msgid } } });
+      await rooms.updateOne({ roomid: sanitize(input.roomid) }, { $pull: { messages: { msgid: sanitize(input.msgid) } } });
       io.to(input.roomid).emit("deletemsg", input.msgid);
     } else if (command == "deleteroom") {
       await rooms.deleteOne({ roomid: input.roomid });
@@ -137,10 +135,12 @@ async function executeUserInput(input) {
       let message = input.data.username + ": " + input.data.message;
       let id = uuidv4();
       if (input.roomid !== null) {
-        await rooms.updateOne({ roomid: input.roomid }, { $push: { messages: { message: message, msgid: id, data: "highlight" } } });
+        await rooms.updateOne(
+          { roomid: sanitize(input.roomid) }, 
+          { $push: { messages: { message: sanitize(message), msgid: sanitize(id), data: "highlight" } } });
         io.to(input.roomid).emit("highlight", { message: message, msgid: id, data: "highlight" });
       } else {
-        await rooms.insertOne({ title: input.data.message, roomid: id, data: "highlight" });
+        await rooms.insertOne({ title: sanitize(input.data.message), roomid: sanitize(id), data: "highlight" });
         io.to("home").emit("highlight", { title: input.data.message, data: "highlight", roomid: id });
       }
     } else {
@@ -179,7 +179,9 @@ io.on("connection", async (socket) => {
         // const itemidnum = Math.floor(Math.random() * 1000);
         // const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
         let messageid = uuidv4();
-        await rooms.updateOne({ roomid: message.roomid }, { $push: { messages: { message: msg, msgid: messageid } } });
+        await rooms.updateOne(
+          { roomid: sanitize(message.roomid) }, 
+          { $push: { messages: { message: sanitize(msg), msgid: sanitize(messageid) } } });
         io.emit("chat message", { message: msg, msgid: messageid });
       }
     }
@@ -211,7 +213,7 @@ io.on("connection", async (socket) => {
         socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the name exceeding 25 characters</span>");
       } else {
         let roomid = uuidv4();
-        await rooms.insertOne({ title: msg, roomid: roomid });
+        await rooms.insertOne({ title: sanitize(msg), roomid: sanitize(roomid) });
         io.to("home").emit("room", { title: msg, roomid: roomid });
       }
     }
@@ -245,7 +247,7 @@ io.on("connection", async (socket) => {
   socket.on("passchange", (msg) => {
     console.log(adminpassword)
     if (msg.adminpass.includes(adminpassword)) {
-      adminpass.updateOne({ id: "admin" }, { $set: { password: msg.newpass } });
+      adminpass.updateOne({ id: "admin" }, { $set: { password: sanitize(msg.newpass) } });
       adminpassword = msg.newpass;
       socket.emit("event", "<span style='color:green;font-weight:800'>Password changed successfully!</span>");
       // console log new password
