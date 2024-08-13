@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { socket } from '@/socket';
 import { stuff } from "@/store";
 import admin from "@/components/admin.vue";
@@ -81,19 +81,25 @@ function onSubmit() {
     stuff.input = "";
   }
 }
+
 function promptUsername() {
   const username = prompt("Please enter your username");
   if (username) {
     stuff.username = username;
-    localStorage.setItem("username", username);
+  } else {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    stuff.username = `Guest ${randomNum}`;
   }
+  localStorage.setItem("username", stuff.username);
 }
+
 function promptRoom() {
   const roomTitle = prompt("Please enter a room name");
   if (roomTitle) {
     socket.emit("room", roomTitle);
   }
 }
+
 function joinRoom(room) {
   if (stuff.delete) {
     socket.emit('admin handler', { adminpass: stuff.adminpass, command: "deleteroom", roomid: room.roomid });
@@ -101,11 +107,22 @@ function joinRoom(room) {
     socket.emit("joinroom", room.roomid);
   }
 }
+
 function deletemsg(msgid) {
   if (stuff.delete) {
     socket.emit('admin handler', { adminpass: stuff.adminpass, command: "deletemsg", msgid: msgid, roomid: stuff.roomid });
   }
 }
+
+onMounted(() => {
+  let username = localStorage.getItem("username");
+  if (!username) {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    username = `Guest ${randomNum}`;
+    localStorage.setItem("username", username);
+  }
+  stuff.username = username;
+});
 </script>
 
 <template>
