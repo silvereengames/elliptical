@@ -38,3 +38,17 @@
     background: transparent;
     border-radius: 8px;
 }
+
+.highlight {
+    @apply bg-yellow-400 rounded-md text-black px-1;
+}
+
+.highlight.below {
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+.highlight.above {
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
+}

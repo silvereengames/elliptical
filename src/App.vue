@@ -34,7 +34,8 @@ socket.on('room', (room) => context.rooms.push(room));
 
 socket.on('message', ({ id, message, highlight }) => context.messages.push({
     id,
-    msg: `<p ${highlight ? 'class="bg-yellow-400 rounded-md text-black"' : ''}>${sanitize(message)}</p>`
+    highlight,
+    msg: `<p>${sanitize(message)}</p>`
 }));
 
 socket.on('users', (msg) => context.online = msg);
@@ -105,16 +106,17 @@ const promptRoom = () => {
 }
 
 const joinRoom = (room) => {
-    if (room.id === context.roomid) return;
-    
-    context.messages = [];
-    
-    if (context.delete) socket.emit('admin handler', {
+    if (context.delete) return socket.emit('admin handler', {
         adminpass: context.adminpass,
         command: 'deleteroom',
         roomid: room.id
     });
-    else socket.emit('joinroom', room.id);
+    
+    if (room.id === context.roomid) return;
+    
+    context.messages = [];
+    
+    socket.emit('joinroom', room.id);
 }
 
 const deletemsg = (msgid) => {
@@ -188,8 +190,7 @@ onMounted(() => {
                 <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}!</h3>
 
                 <ul>
-                    <li v-for="(message, index) in context.messages" :key="index" v-html="message.msg"
-                        @click="deletemsg(message.id)"></li>
+                    <li v-for="(message, index) in context.messages" :key="index" :class="message.highlight ? 'highlight ' + (context.messages[index + 1].highlight ? 'below' : 'above') : ''" v-html="message.msg" @click="deletemsg(message.id)"></li>
                 </ul>
             </div>
 

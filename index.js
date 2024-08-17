@@ -70,7 +70,7 @@ const getroom = async (socket) => {
 const get = async (socket, id) => {
     try {
         const room = await rooms.findOne({ roomid: id });
-        
+                
         if (!room || !room.messages) return;
 
         for (const message of room.messages) {
@@ -231,23 +231,23 @@ io.on('connection', async (socket) => {
         else {
             if (msg.length >= 25) socket.emit('event', 'Too many characters in room name (25 max)');
             else {
-                const roomid = uuid();
+                const id = uuid();
 
                 await rooms.insertOne({
                     title: msg,
-                    roomid: roomid,
+                    roomid: id,
                     messages: []
                 });
                 
                 io.to('home').emit('room', {
                     title: msg,
-                    roomid: roomid
+                    id
                 });
             }
         }
     });
 
-    socket.on('joinroom', async (id) => {
+    socket.on('joinroom', async (id) => {        
         try {
             socket.join(id);
             socket.emit('joined', id);
@@ -268,7 +268,6 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('passchange', (msg) => {
-        console.log(context.PASSWORD)
         if (msg.adminpass.includes(context.PASSWORD)) {
             adminpass.updateOne({
                 id: 'admin'
