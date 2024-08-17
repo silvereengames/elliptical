@@ -1,4 +1,4 @@
-# elliptical
+# Elliptical
 The most simple socket.io web-based live chatting platform with simple moderation features
 
 ## Setup
@@ -30,4 +30,6 @@ Open with admin options by going to `localhost:3000/admin`
 ## Todo
 - [x] Re-do the css
 - [x] Re-do the admin panel
+- [ ] Notification sounds
+- [ ] Mute button for notification sounds
 - [ ] Ability to make public and private rooms
