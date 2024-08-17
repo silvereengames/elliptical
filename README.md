@@ -28,6 +28,6 @@ node index.js
 Open with admin options by going to `localhost:3000/admin`
 
 ## Todo
-- [ ] Re-do the css
-- [ ] Re-do the admin panel
+- [x] Re-do the css
+- [x] Re-do the admin panel
 - [ ] Ability to make public and private rooms
