@@ -70,7 +70,7 @@ const getroom = async (socket) => {
 const get = async (socket, id) => {
     try {
         const room = await rooms.findOne({ roomid: id });
-                
+
         if (!room || !room.messages) return;
 
         for (const message of room.messages) {
@@ -100,19 +100,19 @@ const executeUserInput = async (input) => {
         } else if (command == 'refresh') io.emit('reload', '');
         else if (command == 'purge') {
             rooms.deleteMany({});
-            
+
             io.emit('purge');
         } else if (command == 'eval') {
             console.log('🔁 Running eval...');
-            
+
             eval(input + '()');
         } else if (command.includes('opentab')) { // Should probably remove this as it is a security risk
             let message = command.substring(7);
-            
+
             io.emit('opentab', message);
         } else if (command == 'deletemsg') {
             await rooms.updateOne({
-                roomid: input.roomid 
+                roomid: input.roomid
             }, {
                 $pull: {
                     messages: {
@@ -120,55 +120,55 @@ const executeUserInput = async (input) => {
                     }
                 }
             });
-            
+
             io.to(input.roomid).emit('delete', {
                 type: 'message',
                 id: input.msgid
             });
         } else if (command == 'deleteroom') {
             await rooms.deleteOne({ roomid: input.roomid });
-            
+
             io.to('home').emit('delete', {
                 type: 'room',
                 id: input.roomid
-            })
-        } else if (command == 'highlight') {
-            // Highlight messages in a room
-            const message = input.data.username + ': ' + input.data.message;
+            });
+        } else if (command == 'highlight') { // Highlight messages in a room
+            if (!input.roomid) return;
 
-            if (input.roomid !== null) {
+            if (input.message) {
                 const id = uuid();
-                
+
                 await rooms.updateOne({
                     roomid: input.roomid
                 }, {
                     $push: {
                         messages: {
-                            message: message,
+                            message,
                             msgid: id,
                             highlight: true
                         }
                     }
                 });
-                
+
                 io.to(input.roomid).emit('message', {
-                    message: message,
+                    message: input.message,
                     id,
                     highlight: true
                 });
             } else {
-                const id = uuid();
-                
-                await rooms.insertOne({
-                    title: input.data.message,
-                    roomid: id,
-                    highlight: true
+                await rooms.updateOne({ roomid: input.roomid }, {
+                    $set: {
+                        highlight: true
+                    }
                 });
                 
+                const room = await rooms.findOne({ roomid: input.roomid });
+                
                 io.to('home').emit('room', {
-                    title: input.data.message,
+                    title: room.title,
+                    id: room.roomid,
                     highlight: true,
-                    id
+                    update: true
                 });
             }
         } else console.log('❌ An invalid command was provided:', command);
@@ -198,7 +198,7 @@ io.on('connection', async (socket) => {
             if (message.length >= 200) {
                 socket.emit('event', 'Too many characters in message (200 max)');
             } else {
-                const messageid = uuid();
+                const id = uuid();
 
                 await rooms.updateOne({
                     roomid
@@ -206,21 +206,21 @@ io.on('connection', async (socket) => {
                     $push: {
                         messages: {
                             message,
-                            msgid: messageid
+                            msgid: id
                         }
                     }
                 });
-                
+
                 io.emit('message', {
                     message,
-                    id: messageid
+                    id
                 });
             }
         }
     });
 
     socket.on('room', async (msg) => {
-        if (typeof msg !== 'string') return console.error('❌ Room name is not a string');
+        if (typeof msg !== 'string') return;
 
         const messageIncludesBlockedTerm = context.BLOCKED.some((term) => msg.replaceAll(' ', '').toLowerCase().includes(term));
         const roomCount = await rooms.countDocuments();
@@ -238,7 +238,7 @@ io.on('connection', async (socket) => {
                     roomid: id,
                     messages: []
                 });
-                
+
                 io.to('home').emit('room', {
                     title: msg,
                     id
@@ -247,7 +247,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('joinroom', async (id) => {        
+    socket.on('joinroom', async (id) => {
         try {
             socket.join(id);
             socket.emit('joined', id);
@@ -276,7 +276,7 @@ io.on('connection', async (socket) => {
                     password: msg.newpass
                 }
             });
-            
+
             context.PASSWORD = msg.newpass;
             socket.emit('event', 'Success');
 

@@ -8,6 +8,7 @@ export const context = reactive({
     roomid: null,
     online: 0,
     delete: false,
+    highlight: false,
     adminpass: '',
     command: '',
     status: {
