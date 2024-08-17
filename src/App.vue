@@ -13,23 +13,28 @@ socket.off();
 console.log('Connecting to server...');
 socket.on('connect', () => console.log('Connected to server with id', socket.id));
 socket.on('disconnect', () => {
-    context.online = 0;
-    context.status.code = 2;
     context.status.text = 'Disconnected';
+    context.status.code = 2;
+    context.online = 0;
 });
 
 socket.on('connect', () => {
-    context.status.code = 0;
     context.status.text = 'Connected';
+    context.status.code = 0;
+    
+    context.messages = [];
+    context.rooms = [];
+    
+    if (context.roomid) joinRoom(context.roomid);
 });
-
-socket.on('room', (room) => context.rooms.push(room));
 
 socket.on('joined', (id) => context.roomid = id);
 
-socket.on('chat message', (msg) => context.messages.push({
-    id: msg.msgid,
-    msg: `<p>${sanitize(msg.message)}</p>`
+socket.on('room', (room) => context.rooms.push(room));
+
+socket.on('message', ({ id, message, highlight }) => context.messages.push({
+    id,
+    msg: `<p ${highlight ? 'class="bg-yellow-400 rounded-md text-black"' : ''}>${sanitize(message)}</p>`
 }));
 
 socket.on('users', (msg) => context.online = msg);
@@ -40,14 +45,6 @@ socket.on('clear', () => {
 });
 
 socket.on('clearmessages', () => context.messages = []);
-
-socket.on('highlight', (doc) => {
-    if (doc.roomid) context.rooms.push(doc);
-    else if (doc.msgid) context.messages.push({
-        id: doc.msgid,
-        msg: `<p class='bg-yellow-400 rounded-md text-black'>${doc.message}</p>`
-    });
-});
 
 socket.on('event', (msg) => notif(msg));
 
@@ -78,12 +75,16 @@ const currentRoomTitle = computed(() => {
 const sanitize = (text) => text
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/'/g, '&quot;')
+    .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
 const onSubmit = () => {
     if (context.input) {
-        socket.emit('chat message', { msg: `${context.username}: ${context.input}`, roomid: context.roomid });
+        socket.emit('message', {
+            username: context.username,
+            message: `${context.username}: ${context.input}`,
+            roomid: context.roomid
+        });
 
         context.input = '';
     }
@@ -164,8 +165,7 @@ onMounted(() => {
 
                 <ul class="overflow-y-scroll h-full scrollbar-transparent" v-if="context.rooms.length !== 0">
                     <li v-for="(room, index) in context.rooms" :key="index" class="my-2 rounded-lg">
-                        <button @click="joinRoom(room)"
-                            :class="['w-full px-4 py-2 rounded-lg', room.data ? 'bg-yellow-400 text-black' : 'bg-blue-500', room.data ? 'hover:bg-yellow-500' : 'hover:bg-blue-600']">
+                        <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
                             {{ room.title }}
                         </button>
                     </li>
@@ -181,7 +181,7 @@ onMounted(() => {
             </div>
 
             <div v-if="context.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
-                <h3>Welcome to #{{ currentRoomTitle }}!</h3>
+                <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}!</h3>
 
                 <ul>
                     <li v-for="(message, index) in context.messages" :key="index" v-html="message.msg"

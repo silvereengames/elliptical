@@ -32,12 +32,12 @@ const context = {
     ]
 }
 
-// Build the site
+// Build the frontend
 await build();
 console.log('✅ Successfully built frontend');
 
 app.use(express.static('dist'));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
+app.use((req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
 
 const password = async () => {
     const result = await adminpass.findOne({ id: 'admin' });
@@ -50,11 +50,9 @@ const password = async () => {
 const getroom = async (socket) => {
     const result = rooms.find({}, { projection: { _id: 0 } });
 
-    socket.emit('clear', '');
-
-    for await (const doc of result) {
-        if (doc.data === 'highlight') socket.emit('highlight', doc);
-        else socket.emit('room', doc);
+    for await (const room of result) {
+        if (room.data === 'room') socket.emit('room', room);
+        else socket.emit('room', room);
     }
 }
 
@@ -62,13 +60,11 @@ const get = async (socket, id) => {
     try {
         const { messages } = await rooms.findOne({ roomid: id });
 
-        socket.emit('clearmessages', '');
-
         if (!messages) return;
 
-        for (const doc of messages) {
-            if (doc.data === 'highlight') socket.emit('highlight', doc);
-            else socket.emit('chat message', doc);
+        for (const message of messages) {
+            if (message.data === 'message') socket.emit('message', message);
+            else socket.emit('message', message);
         }
     } catch (error) {
         console.warn('❌ Error! ' + error);
@@ -118,16 +114,42 @@ const executeUserInput = async (input) => {
                 id: input.roomid
             })
         } else if (command == 'highlight') {
-            // Broadcast the message to others
+            // Highlight messages in a room
             const message = input.data.username + ': ' + input.data.message;
             const id = uuid();
 
             if (input.roomid !== null) {
-                await rooms.updateOne({ roomid: input.roomid }, { $push: { messages: { message: message, msgid: id, data: 'highlight' } } });
-                io.to(input.roomid).emit('highlight', { message: message, msgid: id, data: 'highlight' });
+                await rooms.updateOne({
+                    roomid: input.roomid
+                }, {
+                    $push: {
+                        messages: {
+                            message: message,
+                            msgid: id,
+                            highlight: true
+                        }
+                    }
+                });
+                
+                io.to(input.roomid).emit('message', {
+                    message: message,
+                    id,
+                    highlight: true
+                });
             } else {
-                await rooms.insertOne({ title: input.data.message, roomid: id, data: 'highlight' });
-                io.to('home').emit('highlight', { title: input.data.message, data: 'highlight', roomid: id });
+                await rooms.insertOne({
+                    title: input.data.message,
+                    roomid: id,
+                    highlight: true,
+                    messages: []
+                });
+                
+                io.to('home').emit('room', {
+                    title: input.data.message,
+                    highlight: true,
+                    id: id,
+                    messages: []
+                });
             }
         } else console.log('❌ An invalid command was provided:', command);
     } catch (error) {
@@ -144,7 +166,7 @@ io.on('connection', async (socket) => {
     io.emit('users', context.ONLINE);
     getroom(socket);
 
-    socket.on('chat message', async ({ roomid, msg: message }) => {
+    socket.on('message', async ({ roomid, message }) => {
         const filtermsgspace = message.replaceAll(' ', '');
         const filtermsgcaps = filtermsgspace.toLowerCase();
         const messageIncludesBlockedTerm = context.BLOCKED.some((term) => filtermsgcaps.includes(term));
@@ -159,7 +181,7 @@ io.on('connection', async (socket) => {
                 const messageid = uuid();
 
                 await rooms.updateOne({ roomid }, { $push: { messages: { message, msgid: messageid } } });
-                io.emit('chat message', { message, msgid: messageid });
+                io.emit('message', { message, id: messageid });
             }
         }
     });
