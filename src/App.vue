@@ -24,8 +24,6 @@ socket.on('connect', () => {
 
     context.messages = [];
     context.rooms = [];
-
-    if (context.roomid) joinRoom(context.roomid);
 });
 
 socket.on('joined', (id) => context.roomid = id);
@@ -50,9 +48,12 @@ socket.on('message', (message) => context.messages.push({
     msg: `<p>${sanitize(message.message)}</p>`
 }));
 
-socket.on('users', (msg) => context.online = msg);
+socket.on('users', (users) => context.online = users);
 
-socket.on('event', (msg) => notif(msg));
+socket.on('event', (event) => notif(event.message, {
+    expires: event?.expires || 25,
+    status: event?.status || 0
+}));
 
 socket.on('opentab', (target) => { // Security risk, should remove
     console.log('Opening', target);

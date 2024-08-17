@@ -86,14 +86,21 @@ const executeUserInput = async (input) => {
     try {
         const command = input.command;
 
-        if (command.charAt(0) === 'm') io.emit('event', `Server: ${command.substring(2)}`);
+        if (command.charAt(0) === 'm') io.emit('event', {
+            message: `Server: ${command.substring(2)}`
+        });
         else if (command == 'lockall') {
-            io.emit('event', 'Chat has been locked');
+            io.emit('event', {
+                message: 'Chat has been locked',
+                status: 1
+            });
             console.log('🔒 All chats locked!');
 
             context.LOCKED = true;
         } else if (command == 'unlockall') {
-            io.emit('event', 'Chat has been unlocked');
+            io.emit('event', {
+                message: 'Chat has been unlocked'
+            });
             console.log('🔓 All chats unlocked!');
 
             context.LOCKED = false;
@@ -161,9 +168,9 @@ const executeUserInput = async (input) => {
                         highlight: true
                     }
                 });
-                
+
                 const room = await rooms.findOne({ roomid: input.roomid });
-                
+
                 io.to('home').emit('room', {
                     title: room.title,
                     id: room.roomid,
@@ -192,11 +199,20 @@ io.on('connection', async (socket) => {
         const messageIncludesBlockedTerm = context.BLOCKED.some((term) => filtermsgcaps.includes(term));
 
         // Emit a warning or take other appropriate action
-        if (messageIncludesBlockedTerm) socket.emit('event', 'Message contains a blocked phrase');
-        else if (context.LOCKED) socket.emit('event', 'Chat has been locked');
+        if (messageIncludesBlockedTerm) socket.emit('event', {
+            message: 'Message contains a blocked phrase',
+            status: 2
+        });
+        else if (context.LOCKED) socket.emit('event', {
+            message: 'Chat has been locked',
+            status: 1
+        });
         else {
             if (message.length >= 200) {
-                socket.emit('event', 'Too many characters in message (200 max)');
+                socket.emit('event', {
+                    message: 'Too many characters in message (200 max)',
+                    status: 2
+                });
             } else {
                 const id = uuid();
 
@@ -225,11 +241,23 @@ io.on('connection', async (socket) => {
         const messageIncludesBlockedTerm = context.BLOCKED.some((term) => msg.replaceAll(' ', '').toLowerCase().includes(term));
         const roomCount = await rooms.countDocuments();
 
-        if (messageIncludesBlockedTerm) socket.emit('event', 'Room name contains a blocked phrase');
-        else if (context.LOCKED == true) socket.emit('event', 'Chat has been locked');
-        else if (roomCount >= context.MAX_ROOMS) socket.emit('event', 'Too many rooms');
+        if (messageIncludesBlockedTerm) socket.emit('event', {
+            message: 'Room name contains a blocked phrase',
+            status: 2
+        });
+        else if (context.LOCKED == true) socket.emit('event', {
+            message: 'Chat has been locked',
+            status: 1
+        });
+        else if (roomCount >= context.MAX_ROOMS) socket.emit('event', {
+            message: 'Too many rooms',
+            status: 2
+        });
         else {
-            if (msg.length >= 25) socket.emit('event', 'Too many characters in room name (25 max)');
+            if (msg.length >= 25) socket.emit('event', {
+                message: 'Too many characters in room name (25 max)',
+                status: 2
+            });
             else {
                 const id = uuid();
 
@@ -278,7 +306,9 @@ io.on('connection', async (socket) => {
             });
 
             context.PASSWORD = msg.newpass;
-            socket.emit('event', 'Success');
+            socket.emit('event', {
+                message: 'Success'
+            });
 
             console.log('✅ Password changed to: ' + msg.newpass);
         } else console.log('❌ Invalid admin password attempt: ' + msg.adminpass);
@@ -288,7 +318,9 @@ io.on('connection', async (socket) => {
         if (msg.adminpass.includes(context.PASSWORD)) {
             context.MAX_ROOMS = msg.maxRooms;
 
-            socket.emit('event', 'Success');
+            socket.emit('event', {
+                message: 'Success'
+            });
 
             console.log('✅ Max rooms updated to: ' + context.MAX_ROOMS);
         } else console.log('❌ Invalid admin password attempt: ' + msg.adminpass);
