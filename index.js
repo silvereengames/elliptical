@@ -150,7 +150,7 @@ const executeUserInput = async (input) => {
                 }, {
                     $push: {
                         messages: {
-                            message,
+                            message: input.message,
                             msgid: id,
                             highlight: true
                         }
