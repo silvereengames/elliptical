@@ -1,284 +1,255 @@
-import express from "express";
-import { createServer } from "node:http";
-import { Server } from "socket.io";
-import { createInterface } from "readline";
-import { MongoClient } from "mongodb";
-import { v4 as uuidv4 } from "uuid";
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { MongoClient } from 'mongodb';
+import { Server } from 'socket.io';
+import { v4 as uuid } from 'uuid';
+import express from 'express';
+import { build } from 'vite';
 
-let client = null;
-//database
-if (process.argv[2] == "Docker") {
-  client = new MongoClient("mongodb://mongodb:27017");
-} else {
-  client = new MongoClient("mongodb://127.0.0.1:27017");
-}
+import { createInterface } from 'node:readline';
+import http from 'node:http';
+import path from 'node:path';
+import url from 'node:url';
+import fs from 'node:fs';
 
-const db = client.db("elliptical");
-const rooms = db.collection("rooms");
-const adminpass = db.collection("admin-password");
-async function start() {
-  try {
-    await client.connect();
-    // await chats.createIndex({ createdAt: 1 }, { expireAfterSeconds: expire * 3600 });
-    console.log("✅ Connected to MongoDB!");
-    password();
-  } catch (error) {
-    console.error("❌ Error connecting to MongoDB:", error);
-  }
-}
+// Initalize database stuff
+const client = new MongoClient(process.argv[2] == 'Docker' ? 'mongodb://mongodb:27017' : 'mongodb://127.0.0.1:27017');
+const db = client.db('elliptical');
+const rooms = db.collection('rooms');
+const adminpass = db.collection('admin-password');
 
-const expire = 1; //Time until messages expire from database in hours(I think) if this causes an error try deleting the collection in mongodb
+// Initalize server stuff
 const app = express();
-const server = createServer(app);
+const server = http.createServer(app);
 const io = new Server(server);
-// const io = new Server(server, {
-//   cors: {
-//     origin: "http://localhost:5173"
-//   }
-// });
 
-var locked = false;
-var cooldown = 1000;
-var cooldownlocked = false;
-var active = 0;
-var adminpassword = "changeme";
-let MAX_ROOMS = 25; // default is 25
+const __dirname = url.fileURLToPath(new URL('./', import.meta.url));
+const context = {
+    LOCKED: false,
+    ONLINE: 0,
+    PASSWORD: 'changeme', // Should probably move this to a .env file later and make it unchangeable
+    MAX_ROOMS: 25,
+    BLOCKED: [
+        'example'
+    ]
+}
 
-const blockedTerms = ["example"];
-
-start();
+// Build the site
+await build();
+console.log('✅ Successfully built frontend');
 
 app.use(express.static('dist'));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const password = async () => {
+    const result = await adminpass.findOne({ id: 'admin' });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-});
+    if (result) return context.PASSWORD = result.password;
 
-async function password() {
-  let result = await adminpass.findOne({ id: "admin" });
-  if (result == null) {
-    adminpass.insertOne({ id: "admin", password: adminpassword });
-  } else {
-    adminpassword = result.password;
-  }
+    adminpass.insertOne({ id: 'admin', password: context.PASSWORD });
 }
 
-async function getroom(socket) {
-  socket.emit("clear", "");
-  let result = rooms.find({}, { projection: { _id: 0 } });
-  for await (const doc of result) {
-    if (doc.data === "highlight") {
-      socket.emit("highlight", doc);
-    } else {
-      socket.emit("room", doc);
+const getroom = async (socket) => {
+    const result = rooms.find({}, { projection: { _id: 0 } });
+
+    socket.emit('clear', '');
+
+    for await (const doc of result) {
+        if (doc.data === 'highlight') socket.emit('highlight', doc);
+        else socket.emit('room', doc);
     }
-  }
 }
 
-async function get(socket, id) {
-  try {
-    socket.emit("clearmessages", "");
-    let room = await rooms.findOne({ roomid: id });
-    let msg = room.messages;
-    if (msg !== undefined) {
-      for (const doc of msg) {
-        if (doc.data === "highlight") {
-          socket.emit("highlight", doc);
-        } else {
-          socket.emit("chat message", doc);
-        }
-      }
-    }
-  } catch (error) {
-    console.warn("❌ Error! " + error);
-
-  }
-}
-
-async function executeUserInput(input) {
-  try {
-    let command = input.command;
-    if (command.charAt(0) === "m") {
-      io.emit("event", `<span style='color:red;font-weight:800'>Server: ${command.substring(2)}</span>`);
-    } else if (command == "lockall") {
-      console.log("🔒 All chats locked!");
-      io.emit("event", "🔒 Chat has been locked!");
-      locked = true;
-    } else if (command == "unlockall") {
-      console.log("🔓 All chats unlocked!");
-      io.emit("event", "🔓 Chat has been unlocked!");
-      locked = false;
-    } else if (command == "refresh") {
-      io.emit("reload", "");
-    } else if (command == "purge") {
-      rooms.deleteMany({});
-      io.emit("reload", "");
-    } else if (command == "eval") {
-      console.log("🔁 Running eval...")
-      eval(input + "()");
-    } else if (command.includes("opentab")) {
-      let message = command.substring(7);
-      io.emit("opentab", message);
-    } else if (command == "deletemsg") {
-      await rooms.updateOne({ roomid: input.roomid }, { $pull: { messages: { msgid: input.msgid } } });
-      io.to(input.roomid).emit("deletemsg", input.msgid);
-    } else if (command == "deleteroom") {
-      await rooms.deleteOne({ roomid: input.roomid });
-      io.to(input.roomid).emit("reload", "");
-      io.to("home").emit("deleteroom", input.roomid);
-    } else if (command == "highlight") {
-      // Broadcast the message to others
-      //const markdown = converter.makeHtml(msg.replace('adminpassword', ''));
-      let message = input.data.username + ": " + input.data.message;
-      let id = uuidv4();
-      if (input.roomid !== null) {
-        await rooms.updateOne({ roomid: input.roomid }, { $push: { messages: { message: message, msgid: id, data: "highlight" } } });
-        io.to(input.roomid).emit("highlight", { message: message, msgid: id, data: "highlight" });
-      } else {
-        await rooms.insertOne({ title: input.data.message, roomid: id, data: "highlight" });
-        io.to("home").emit("highlight", { title: input.data.message, data: "highlight", roomid: id });
-      }
-    } else {
-      console.log("❌ Invalid command!");
-    }
-  } catch (error) {
-    console.warn("❌ Error! " + error);
-  }
-}
-
-io.on("connection", async (socket) => {
-  console.log("📥 New user connected: " + socket.id);
-  //io.emit('event', 'A user connected');
-  socket.join("home");
-  active++;
-  io.emit("users", active);
-  getroom(socket);
-  // get(socket);
-  socket.on("chat message", async (message) => {
-    let msg = message.msg;
-    const filtermsgspace = msg.replaceAll(" ", "");
-    const filtermsgcaps = filtermsgspace.toLowerCase();
-    const regex = /^[ -~]*$/;
-    const messageIncludesBlockedTerm = blockedTerms.some((term) => filtermsgcaps.includes(term));
-    if (messageIncludesBlockedTerm) {
-      // Emit a warning or take other appropriate action
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to the active moderation rules.</span>");
-    } else if (!regex.test(msg)) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to the active moderation rules.</span>");
-    } else if (locked == true) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to the chat being locked</span>");
-    } else {
-      if (msg.length >= 200) {
-        socket.emit("event", "<span style='color:red;font-weight:800'>Your message could not be sent due to it being longer than 200 characters</span>");
-      } else {
-        // const itemidnum = Math.floor(Math.random() * 1000);
-        // const messageid = btoa(msg.replaceAll(' ', '') + itemidnum);
-        let messageid = uuidv4();
-        await rooms.updateOne({ roomid: message.roomid }, { $push: { messages: { message: msg, msgid: messageid } } });
-        io.emit("chat message", { message: msg, msgid: messageid });
-      }
-    }
-  });
-
-  socket.on("room", async (msg) => {
-    let filtermsgspace = "";
-    if (typeof msg === "string") {
-      filtermsgspace = msg.replaceAll(" ", "");
-    } else {
-      console.error("❌ msg is not a string:", msg);
-    }
-    const filtermsgcaps = filtermsgspace.toLowerCase();
-    const regex = /^[ -~]*$/;
-    const messageIncludesBlockedTerm = blockedTerms.some((term) => filtermsgcaps.includes(term));
-    
-    const roomCount = await rooms.countDocuments();
-  
-    if (messageIncludesBlockedTerm) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the active moderation rules!</span>");
-    } else if (!regex.test(msg)) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the active moderation rules!</span>");
-    } else if (locked == true) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to chat being locked!</span>");
-    } else if (roomCount >= MAX_ROOMS) {
-      socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the room limit!</span>");
-    } else {
-      if (msg.length >= 25) {
-        socket.emit("event", "<span style='color:red;font-weight:800'>Your room could not be created due to the name exceeding 25 characters</span>");
-      } else {
-        let roomid = uuidv4();
-        await rooms.insertOne({ title: msg, roomid: roomid });
-        io.to("home").emit("room", { title: msg, roomid: roomid });
-      }
-    }
-  });
-
-  socket.on("joinroom", async (id) => {
+const get = async (socket, id) => {
     try {
-      socket.join(id);
-      socket.emit("joined", id);
-      get(socket, id);
+        const { messages } = await rooms.findOne({ roomid: id });
+
+        socket.emit('clearmessages', '');
+
+        if (!messages) return;
+
+        for (const doc of messages) {
+            if (doc.data === 'highlight') socket.emit('highlight', doc);
+            else socket.emit('chat message', doc);
+        }
     } catch (error) {
-      console.warn("❌ Error! " + error);
+        console.warn('❌ Error! ' + error);
     }
-  });
+}
 
-  socket.on("disconnect", () => {
-    //io.emit('event', 'A user disconnected');
-    active--;
-    io.emit("users", active);
-  });
+const executeUserInput = async (input) => {
+    try {
+        const command = input.command;
 
-  socket.on("admin handler", (msg) => {
-    if (msg.adminpass.includes(adminpassword)) {
-      executeUserInput(msg);
-      //console.log(msg);
-      //console.log(msg.replace('adminpassword', ''));
-    } else {
-      console.log("❌ Invalid admin password attempt: " + msg.adminpass);
+        if (command.charAt(0) === 'm') io.emit('event', `Server: ${command.substring(2)}`);
+        else if (command == 'lockall') {
+            io.emit('event', 'Chat has been locked');
+            console.log('🔒 All chats locked!');
+
+            context.LOCKED = true;
+        } else if (command == 'unlockall') {
+            io.emit('event', 'Chat has been unlocked');
+            console.log('🔓 All chats unlocked!');
+
+            context.LOCKED = false;
+        } else if (command == 'refresh') io.emit('reload', '');
+        else if (command == 'purge') {
+            rooms.deleteMany({});
+            
+            io.emit('purge');
+        } else if (command == 'eval') {
+            console.log('🔁 Running eval...');
+            
+            eval(input + '()');
+        } else if (command.includes('opentab')) { // Should probably remove this as it is a security risk
+            let message = command.substring(7);
+            
+            io.emit('opentab', message);
+        } else if (command == 'deletemsg') {
+            await rooms.updateOne({ roomid: input.roomid }, { $pull: { messages: { msgid: input.msgid } } });
+            
+            io.to(input.roomid).emit('delete', {
+                type: 'message',
+                id: input.msgid
+            });
+        } else if (command == 'deleteroom') {
+            await rooms.deleteOne({ roomid: input.roomid });
+            
+            io.to('home').emit('delete', {
+                type: 'room',
+                id: input.roomid
+            })
+        } else if (command == 'highlight') {
+            // Broadcast the message to others
+            const message = input.data.username + ': ' + input.data.message;
+            const id = uuid();
+
+            if (input.roomid !== null) {
+                await rooms.updateOne({ roomid: input.roomid }, { $push: { messages: { message: message, msgid: id, data: 'highlight' } } });
+                io.to(input.roomid).emit('highlight', { message: message, msgid: id, data: 'highlight' });
+            } else {
+                await rooms.insertOne({ title: input.data.message, roomid: id, data: 'highlight' });
+                io.to('home').emit('highlight', { title: input.data.message, data: 'highlight', roomid: id });
+            }
+        } else console.log('❌ An invalid command was provided:', command);
+    } catch (error) {
+        console.warn('❌ Error!', error);
     }
-  });
-  socket.on("passchange", (msg) => {
-    console.log(adminpassword)
-    if (msg.adminpass.includes(adminpassword)) {
-      adminpass.updateOne({ id: "admin" }, { $set: { password: msg.newpass } });
-      adminpassword = msg.newpass;
-      socket.emit("event", "<span style='color:green;font-weight:800'>Password changed successfully!</span>");
-      // console log new password
-      console.log("✅ Password changed to: " + msg.newpass);
-    } else {
-      console.log("❌ Invalid admin password attempt: " + msg.adminpass);
-    }
-  });
-  socket.on("updateMaxRooms", (msg) => {
-    if (msg.adminpass.includes(adminpassword)) {
-      MAX_ROOMS = msg.maxRooms;
-      socket.emit("event", "<span style='color:green;font-weight:800'>Max rooms updated successfully!</span>");
-      console.log("✅ Max rooms updated to: " + MAX_ROOMS);
-    } else {
-      console.log("❌ Invalid admin password attempt: " + msg.adminpass);
-    }
-  });
+}
+
+// Handle socket.io events
+io.on('connection', async (socket) => {
+    console.log('📥 New user connected with id', socket.id);
+
+    socket.join('home');
+    context.ONLINE++;
+    io.emit('users', context.ONLINE);
+    getroom(socket);
+
+    socket.on('chat message', async ({ roomid, msg: message }) => {
+        const filtermsgspace = message.replaceAll(' ', '');
+        const filtermsgcaps = filtermsgspace.toLowerCase();
+        const messageIncludesBlockedTerm = context.BLOCKED.some((term) => filtermsgcaps.includes(term));
+
+        // Emit a warning or take other appropriate action
+        if (messageIncludesBlockedTerm) socket.emit('event', 'Message contains a blocked phrase');
+        else if (context.LOCKED) socket.emit('event', 'Chat has been locked');
+        else {
+            if (message.length >= 200) {
+                socket.emit('event', 'Too many characters in message (200 max)');
+            } else {
+                const messageid = uuid();
+
+                await rooms.updateOne({ roomid }, { $push: { messages: { message, msgid: messageid } } });
+                io.emit('chat message', { message, msgid: messageid });
+            }
+        }
+    });
+
+    socket.on('room', async (msg) => {
+        if (typeof msg !== 'string') return console.error('❌ Room name is not a string');
+
+        const messageIncludesBlockedTerm = context.BLOCKED.some((term) => msg.replaceAll(' ', '').toLowerCase().includes(term));
+        const roomCount = await rooms.countDocuments();
+
+        if (messageIncludesBlockedTerm) socket.emit('event', 'Room name contains a blocked phrase');
+        else if (context.LOCKED == true) socket.emit('event', 'Chat has been locked');
+        else if (roomCount >= context.MAX_ROOMS) socket.emit('event', 'Too many rooms');
+        else {
+            if (msg.length >= 25) socket.emit('event', 'Too many characters in room name (25 max)');
+            else {
+                const roomid = uuid();
+
+                await rooms.insertOne({ title: msg, roomid: roomid });
+                io.to('home').emit('room', { title: msg, roomid: roomid });
+            }
+        }
+    });
+
+    socket.on('joinroom', async (id) => {
+        try {
+            socket.join(id);
+            socket.emit('joined', id);
+            get(socket, id);
+        } catch (e) {
+            console.warn('❌ Error!', e);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        context.ONLINE--;
+        io.emit('users', context.ONLINE);
+    });
+
+    socket.on('admin handler', (msg) => {
+        if (msg.adminpass.includes(context.PASSWORD)) executeUserInput(msg);
+        else console.log('❌ Invalid admin password attempt: ' + msg.adminpass);
+    });
+
+    socket.on('passchange', (msg) => {
+        console.log(context.PASSWORD)
+        if (msg.adminpass.includes(context.PASSWORD)) {
+            adminpass.updateOne({ id: 'admin' }, { $set: { password: msg.newpass } });
+            context.PASSWORD = msg.newpass;
+            socket.emit('event', 'Success');
+
+            console.log('✅ Password changed to: ' + msg.newpass);
+        } else console.log('❌ Invalid admin password attempt: ' + msg.adminpass);
+    });
+
+    socket.on('updateMaxRooms', (msg) => {
+        if (msg.adminpass.includes(context.PASSWORD)) {
+            context.MAX_ROOMS = msg.maxRooms;
+
+            socket.emit('event', 'Success');
+
+            console.log('✅ Max rooms updated to: ' + context.MAX_ROOMS);
+        } else console.log('❌ Invalid admin password attempt: ' + msg.adminpass);
+    });
 });
 
-server.listen(3000, () => {
-  console.log("✅ Elliptical server running at http://localhost:3000");
-});
+// Connect to the database
+try {
+    await client.connect();
 
+    console.log('✅ Connected to MongoDB');
+
+    password();
+} catch (error) {
+    console.error('❌ Error connecting to MongoDB', error);
+}
+
+// Start the server
+server.listen(3000, () => console.log('✅ Elliptical server running at http://localhost:3000'));
+
+
+// Create a simple command line interface for executing commands
 const rl = createInterface({
-  input: process.stdin,
-  output: process.stdout,
+    input: process.stdin,
+    output: process.stdout,
 });
 
-function command() {
-  rl.question("✅ Ready for chat commands!\n", (input) => {
+const command = () => rl.question('✅ Ready for chat commands\n', (input) => {
     executeUserInput({ command: input }); // Execute your function
     command();
-  });
-}
+});
 
 command();
