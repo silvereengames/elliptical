@@ -21,32 +21,39 @@ socket.on('disconnect', () => {
 socket.on('connect', () => {
     context.status.text = 'Connected';
     context.status.code = 0;
-    
+
     context.messages = [];
     context.rooms = [];
-    
-    if (context.roomid) joinRoom(context.roomid);
 });
 
 socket.on('joined', (id) => context.roomid = id);
 
-socket.on('room', (room) => context.rooms.push(room));
+socket.on('room', (room) => {
+    if (room.update) {
+        delete room.update
 
-socket.on('message', ({ id, message, highlight }) => context.messages.push({
-    id,
-    msg: `<p ${highlight ? 'class="bg-yellow-400 rounded-md text-black"' : ''}>${sanitize(message)}</p>`
-}));
+        return context.rooms = context.rooms.map((roomData) => {
+            if (roomData.id === room.id) return room;
 
-socket.on('users', (msg) => context.online = msg);
+            return roomData;
+        });
+    }
 
-socket.on('clear', () => {
-    context.rooms = [];
-    context.messages = [];
+    context.rooms.push(room);
 });
 
-socket.on('clearmessages', () => context.messages = []);
+socket.on('message', (message) => context.messages.push({
+    id: message.id,
+    highlight: message.highlight || false,
+    msg: `<p>${sanitize(message.message)}</p>`
+}));
 
-socket.on('event', (msg) => notif(msg));
+socket.on('users', (users) => context.online = users);
+
+socket.on('event', (event) => notif(event.message, {
+    expires: event?.expires || 25,
+    status: event?.status || 0
+}));
 
 socket.on('opentab', (target) => { // Security risk, should remove
     console.log('Opening', target);
@@ -54,21 +61,21 @@ socket.on('opentab', (target) => { // Security risk, should remove
 });
 
 socket.on('delete', ({ type, id }) => {
-    if (type === 'room') {
-        context.rooms = context.rooms.filter((room) => room.roomid !== id);
-        
+    if (type === 'room' && id) {
+        context.rooms = context.rooms.filter((room) => room.id !== id);
+
         if (context.roomid === id) context.roomid = null;
     }
-    else if (type === 'message') context.messages = context.messages.filter((message) => message.id !== id);
+    else if (type === 'message' && id) context.messages = context.messages.filter((message) => message.id !== id);
 });
 
 socket.on('purge', () => {
-    context.rooms = [];
     context.messages = [];
+    context.rooms = [];
 });
 
 const currentRoomTitle = computed(() => {
-    const room = context.rooms.find((room) => room.roomid == context.roomid);
+    const room = context.rooms.find((room) => room.id == context.roomid);
     return room ? room.title : '';
 });
 
@@ -80,7 +87,13 @@ const sanitize = (text) => text
 
 const onSubmit = () => {
     if (context.input) {
-        socket.emit('message', {
+        if (context.highlight) socket.emit('admin handler', {
+            adminpass: context.adminpass,
+            command: 'highlight',
+            roomid: context.roomid,
+            message: `${context.username}: ${context.input}`
+        });
+        else socket.emit('message', {
             username: context.username,
             message: `${context.username}: ${context.input}`,
             roomid: context.roomid
@@ -105,12 +118,23 @@ const promptRoom = () => {
 }
 
 const joinRoom = (room) => {
-    if (context.delete) socket.emit('admin handler', {
+    if (context.delete) return socket.emit('admin handler', {
         adminpass: context.adminpass,
         command: 'deleteroom',
-        roomid: room.roomid
+        roomid: room.id
     });
-    else socket.emit('joinroom', room.roomid);
+
+    if (context.highlight) return socket.emit('admin handler', {
+        adminpass: context.adminpass,
+        command: 'highlight',
+        roomid: room.id
+    });
+
+    if (room.id === context.roomid) return;
+
+    context.messages = [];
+
+    socket.emit('joinroom', room.id);
 }
 
 const deletemsg = (msgid) => {
@@ -165,7 +189,8 @@ onMounted(() => {
 
                 <ul class="overflow-y-scroll h-full scrollbar-transparent" v-if="context.rooms.length !== 0">
                     <li v-for="(room, index) in context.rooms" :key="index" class="my-2 rounded-lg">
-                        <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
+                        <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg"
+                            :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
                             {{ room.title }}
                         </button>
                     </li>
@@ -177,15 +202,17 @@ onMounted(() => {
                     </button>
                 </div>
 
-                <p v-if="context.rooms.length === 0" class="mt-4 text-gray-300 text-sm">No active rooms, create one below</p>
+                <p v-if="context.rooms.length === 0" class="mt-4 text-gray-300 text-sm">No active rooms, create one
+                    below</p>
             </div>
 
             <div v-if="context.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
-                <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}!</h3>
+                <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}</h3>
 
                 <ul>
-                    <li v-for="(message, index) in context.messages" :key="index" v-html="message.msg"
-                        @click="deletemsg(message.id)"></li>
+                    <li v-for="(message, index) in context.messages" :key="index"
+                        :class="message.highlight ? 'highlight' + ((context.messages[index + 1]?.highlight ? ' below' : '') + (context.messages[index - 1]?.highlight ? ' above' : '')) : ''"
+                        v-html="message.msg" @click="deletemsg(message.id)"></li>
                 </ul>
             </div>
 

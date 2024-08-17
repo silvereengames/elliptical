@@ -8,10 +8,23 @@ const adminhandler = (command) => socket.emit('admin handler', {
     command
 });
 
-const highlight = () => socket.emit('admin handler', { adminpass: context.adminpass, command: 'highlight', roomid: context.roomid, data: { username: context.username, message: context.command } });
-const updateMaxRooms = () => socket.emit('updateMaxRooms', { adminpass: this.adminpass, maxRooms: this.maxRooms });
-const passchange = () => socket.emit('passchange', { adminpass: context.adminpass, newpass: context.command });
-const toggleSwitch = (e) => {
+const updateMaxRooms = () => socket.emit('updateMaxRooms', {
+    adminpass: this.adminpass,
+    maxRooms: this.maxRooms
+});
+
+const passchange = () => socket.emit('passchange', {
+    adminpass: context.adminpass,
+    newpass: context.command
+});
+
+const toggleHighlight = () => {
+    context.highlight = !context.highlight;
+    
+    if (context.highlight) notif('All messages sent will be highlighted, click on a room to highlight it');
+}
+
+const toggleZap = () => {
     context.delete = !context.delete;
     
     if (context.delete) notif('Click on a room or message to delete it', {
@@ -44,8 +57,22 @@ const toggleSwitch = (e) => {
             <button class="w-24 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="adminhandler('lockall')">Lock</button>
             <button class="w-24 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="adminhandler('unlockall')">Unlock</button>
             <button class="w-38 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="adminhandler('purge')">Purge Rooms</button>
-            <button class="w-24 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="highlight()">Highlight</button>
             <button class="w-38 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="passchange()">Change Password</button>
+            
+            <div class="flex items-center">
+                <label class="m-1">Highlight:</label>
+                
+                <span :class="{
+                        'bg-blue-500': context.highlight,
+                        'bg-gray-500': !context.highlight
+                    }"class="relative inline-block w-12 h-6 rounded-md transition-colors duration-300 ease-in-out cursor-pointer"
+                    @click="toggleHighlight">
+                    <span :class="{
+                            'translate-x-6_5': context.highlight,
+                            'translate-x-0.5': !context.highlight
+                        }" class="absolute left-0 top-0 w-5 h-5 bg-white rounded-md shadow transform transition-transform duration-300 ease-in-out" style="margin-top: 2px;"></span>
+                </span>
+            </div>
             
             <div class="flex items-center">
                 <label class="m-1">Zap mode:</label>
@@ -54,7 +81,7 @@ const toggleSwitch = (e) => {
                         'bg-blue-500': context.delete,
                         'bg-gray-500': !context.delete
                     }"class="relative inline-block w-12 h-6 rounded-md transition-colors duration-300 ease-in-out cursor-pointer"
-                    @click="toggleSwitch">
+                    @click="toggleZap">
                     <span :class="{
                             'translate-x-6_5': context.delete,
                             'translate-x-0.5': !context.delete
