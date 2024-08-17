@@ -44,25 +44,36 @@ const password = async () => {
 
     if (result) return context.PASSWORD = result.password;
 
-    adminpass.insertOne({ id: 'admin', password: context.PASSWORD });
+    adminpass.insertOne({
+        id: 'admin',
+        password: context.PASSWORD
+    });
 }
 
 const getroom = async (socket) => {
-    const result = rooms.find({}, { projection: { _id: 0 } });
+    const result = rooms.find({}, {
+        projection: {
+            _id: 0
+        }
+    });
 
     for await (const room of result) {
         if (room.data === 'room') socket.emit('room', room);
-        else socket.emit('room', room);
+        else socket.emit('room', {
+            highlight: room.highlight,
+            title: room.title,
+            id: room.roomid
+        });
     }
 }
 
 const get = async (socket, id) => {
     try {
-        const { messages } = await rooms.findOne({ roomid: id });
+        const room = await rooms.findOne({ roomid: id });
+        
+        if (!room || !room.messages) return;
 
-        if (!messages) return;
-
-        for (const message of messages) {
+        for (const message of room.messages) {
             if (message.data === 'message') socket.emit('message', message);
             else socket.emit('message', message);
         }
@@ -100,7 +111,15 @@ const executeUserInput = async (input) => {
             
             io.emit('opentab', message);
         } else if (command == 'deletemsg') {
-            await rooms.updateOne({ roomid: input.roomid }, { $pull: { messages: { msgid: input.msgid } } });
+            await rooms.updateOne({
+                roomid: input.roomid 
+            }, {
+                $pull: {
+                    messages: {
+                        msgid: input.msgid
+                    }
+                }
+            });
             
             io.to(input.roomid).emit('delete', {
                 type: 'message',
@@ -116,9 +135,10 @@ const executeUserInput = async (input) => {
         } else if (command == 'highlight') {
             // Highlight messages in a room
             const message = input.data.username + ': ' + input.data.message;
-            const id = uuid();
 
             if (input.roomid !== null) {
+                const id = uuid();
+                
                 await rooms.updateOne({
                     roomid: input.roomid
                 }, {
@@ -137,18 +157,18 @@ const executeUserInput = async (input) => {
                     highlight: true
                 });
             } else {
+                const id = uuid();
+                
                 await rooms.insertOne({
                     title: input.data.message,
                     roomid: id,
-                    highlight: true,
-                    messages: []
+                    highlight: true
                 });
                 
                 io.to('home').emit('room', {
                     title: input.data.message,
                     highlight: true,
-                    id: id,
-                    messages: []
+                    id
                 });
             }
         } else console.log('❌ An invalid command was provided:', command);
@@ -180,8 +200,21 @@ io.on('connection', async (socket) => {
             } else {
                 const messageid = uuid();
 
-                await rooms.updateOne({ roomid }, { $push: { messages: { message, msgid: messageid } } });
-                io.emit('message', { message, id: messageid });
+                await rooms.updateOne({
+                    roomid
+                }, {
+                    $push: {
+                        messages: {
+                            message,
+                            msgid: messageid
+                        }
+                    }
+                });
+                
+                io.emit('message', {
+                    message,
+                    id: messageid
+                });
             }
         }
     });
@@ -200,8 +233,16 @@ io.on('connection', async (socket) => {
             else {
                 const roomid = uuid();
 
-                await rooms.insertOne({ title: msg, roomid: roomid });
-                io.to('home').emit('room', { title: msg, roomid: roomid });
+                await rooms.insertOne({
+                    title: msg,
+                    roomid: roomid,
+                    messages: []
+                });
+                
+                io.to('home').emit('room', {
+                    title: msg,
+                    roomid: roomid
+                });
             }
         }
     });
@@ -229,7 +270,14 @@ io.on('connection', async (socket) => {
     socket.on('passchange', (msg) => {
         console.log(context.PASSWORD)
         if (msg.adminpass.includes(context.PASSWORD)) {
-            adminpass.updateOne({ id: 'admin' }, { $set: { password: msg.newpass } });
+            adminpass.updateOne({
+                id: 'admin'
+            }, {
+                $set: {
+                    password: msg.newpass
+                }
+            });
+            
             context.PASSWORD = msg.newpass;
             socket.emit('event', 'Success');
 

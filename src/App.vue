@@ -55,7 +55,7 @@ socket.on('opentab', (target) => { // Security risk, should remove
 
 socket.on('delete', ({ type, id }) => {
     if (type === 'room') {
-        context.rooms = context.rooms.filter((room) => room.roomid !== id);
+        context.rooms = context.rooms.filter((room) => room.id !== id);
         
         if (context.roomid === id) context.roomid = null;
     }
@@ -68,7 +68,7 @@ socket.on('purge', () => {
 });
 
 const currentRoomTitle = computed(() => {
-    const room = context.rooms.find((room) => room.roomid == context.roomid);
+    const room = context.rooms.find((room) => room.id == context.roomid);
     return room ? room.title : '';
 });
 
@@ -105,12 +105,16 @@ const promptRoom = () => {
 }
 
 const joinRoom = (room) => {
+    if (room.id === context.roomid) return;
+    
+    context.messages = [];
+    
     if (context.delete) socket.emit('admin handler', {
         adminpass: context.adminpass,
         command: 'deleteroom',
-        roomid: room.roomid
+        roomid: room.id
     });
-    else socket.emit('joinroom', room.roomid);
+    else socket.emit('joinroom', room.id);
 }
 
 const deletemsg = (msgid) => {
