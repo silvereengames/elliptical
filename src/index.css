@@ -8,6 +8,7 @@
 
 * {
     font-family: 'Raleway', sans-serif;
+    transition: ease-in-out background .3s;
 }
 
 .translate-x-6_5 {

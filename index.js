@@ -293,7 +293,7 @@ io.on('connection', async (socket) => {
             delete room.roomid;
 
             socket.emit('room', room);
-        } catch {} // Room does not exist
+        } catch { } // Room does not exist
     });
 
     socket.on('join', async (id) => {
