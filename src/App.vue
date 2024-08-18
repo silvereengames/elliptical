@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, reactive, onMounted } from 'vue';
 
 import admin from '@/components/Admin.vue';
 import { context } from '@/store';
@@ -7,6 +7,19 @@ import { notif } from '@/utils';
 import socket from '@/socket';
 
 const path = location.pathname;
+const newRoom = reactive({
+    open: false,
+    title: '',
+    private: false
+});
+const joinRoomModal = reactive({
+    open: false,
+    code: ''
+});
+const usernameModal = reactive({
+    open: false,
+    username: context.username
+});
 
 socket.off();
 
@@ -24,6 +37,12 @@ socket.on('connect', () => {
 
     context.messages = [];
     context.rooms = [];
+    
+    if ('private-codes' in localStorage) try {
+        context.codes = JSON.parse(localStorage.getItem('private-codes'));
+        
+        context.codes.forEach((code) => socket.emit('join private', code));
+    } catch {}
 });
 
 socket.on('joined', (id) => context.roomid = id);
@@ -40,6 +59,8 @@ socket.on('room', (room) => {
     }
 
     context.rooms.push(room);
+    
+    context.rooms = context.rooms;
 });
 
 socket.on('message', (message) => context.messages.push({
@@ -111,12 +132,6 @@ const promptUsername = () => {
     localStorage.setItem('username', context.username);
 }
 
-const promptRoom = () => {
-    const roomTitle = prompt('Please enter a room name');
-
-    if (roomTitle) socket.emit('room', roomTitle);
-}
-
 const joinRoom = (room) => {
     if (context.delete) return socket.emit('admin handler', {
         adminpass: context.adminpass,
@@ -134,7 +149,7 @@ const joinRoom = (room) => {
 
     context.messages = [];
 
-    socket.emit('joinroom', room.id);
+    socket.emit('join', room.id);
 }
 
 const deletemsg = (msgid) => {
@@ -144,6 +159,75 @@ const deletemsg = (msgid) => {
         msgid: msgid,
         roomid: context.roomid
     });
+}
+
+const togglePrivate = () => newRoom.private = !newRoom.private;
+const createRoom = () => {    
+    if (!newRoom.title) return notif('A room title was not provided', {
+        status: 2
+    });
+    
+    const code = (Math.random() + 1).toString(36).substring(7);
+    
+    socket.emit('room', {
+        title: newRoom.title,
+        private: newRoom.private,
+        ...(newRoom.private ? {
+            code
+        } : {})
+    });
+    
+    if (newRoom.private && 'private-codes' in localStorage) try {
+        const codes = JSON.parse(localStorage.getItem('private-codes'));
+        
+        codes.push(code);
+        
+        context.codes = codes;
+        localStorage.setItem('private-codes', JSON.stringify(codes));
+    } catch {
+        context.codes = [code];
+        localStorage.setItem('private-codes', JSON.stringify([code]));
+    }
+    
+    newRoom.private = false;
+    newRoom.open = false;
+    newRoom.title = '';
+}
+
+const joinPrivateRoom = () => {
+    if (joinRoomModal.code.length !== 5) return notif('The code is 5 characters long', {
+        status: 2
+    });
+    
+    console.log(context.codes.includes(joinRoomModal.code));
+    
+    if (context.codes.includes(joinRoomModal.code)) return notif('You are already in that room');
+    
+    socket.emit('join private', joinRoomModal.code);
+    
+    try {
+        const codes = JSON.parse(localStorage.getItem('private-codes'));
+        
+        codes.push(joinRoomModal.code);
+        
+        context.codes = codes;
+        localStorage.setItem('private-codes', JSON.stringify(codes));
+    } catch {
+        context.codes = [joinRoomModal.code];
+        localStorage.setItem('private-codes', JSON.stringify([joinRoomModal.code]));
+    }
+    
+    joinRoomModal.open = false;
+    joinRoomModal.code = '';
+}
+
+const setUsername = () => {
+    if (!usernameModal.username) return;
+    
+    localStorage.setItem('username', usernameModal.username);
+    
+    context.username = usernameModal.username;
+    usernameModal.open = false;
 }
 
 onMounted(() => {
@@ -156,37 +240,79 @@ onMounted(() => {
 </script>
 
 <template>
-    <!--<div id="default-modal" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-50 flex justify-center items-center w-full md:inset-0 bg bg-gray-600/50">
+    <!--Room creation modal-->
+    <div v-if="newRoom.open" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-40 flex justify-center items-center w-full md:inset-0 bg bg-gray-600/50">
         <div class="relative w-full max-w-2xl max-h-full bg-gray-800 rounded-lg shadow p-6 text-white text-center">
             <h3 class="text-xl font-semibold">
                 Create a Room
             </h3>
 
             <div class="py-4 font-semibold text-gray-400 align-middle">
-                <input placeholder="Room name" type="text" maxlength="25" class="w-80 py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none text-white">
-                
-                <div class="flex justify-center items-center mt-2">
+                <input placeholder="Room name" type="text" maxlength="25" class="w-80 py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none text-white" v-model="newRoom.title">
+
+                <div class="flex justify-center items-center mt-2 mb-1">
                     <label>Private</label>
-                    
+
                     <span :class="{
-                        'bg-blue-500': context.highlight,
-                        'bg-gray-600': !context.highlight
-                    }" class="relative inline-block w-12 h-6 ml-2 rounded-md transition-colors duration-300 ease-in-out cursor-pointer" @click="toggleHighlight">
+                        'bg-blue-500': newRoom.private,
+                        'bg-gray-600': !newRoom.private
+                    }" class="relative inline-block w-12 h-6 ml-2 rounded-md transition-colors duration-300 ease-in-out cursor-pointer"
+                        @click="togglePrivate">
                         <span :class="{
-                                'translate-x-6_5': context.highlight,
-                                'translate-x-0.5': !context.highlight
-                            }" class="absolute left-0 top-0 w-5 h-5 bg-white rounded-md shadow transform transition-transform duration-300 ease-in-out" style="margin-top: 2px;"></span>
+                            'translate-x-6_5': newRoom.private,
+                            'translate-x-0.5': !newRoom.private
+                        }"
+                            class="absolute left-0 top-0 w-5 h-5 bg-white rounded-md shadow transform transition-transform duration-300 ease-in-out"
+                            style="margin-top: 2px;"></span>
                     </span>
                 </div>
+                
+                <small v-if="newRoom.private" class="font-normal">Private rooms will be deleted after 14 days of inactivity</small>
             </div>
 
             <div class="flex justify-center">
-                <button data-modal-hide="default-modal" type="button" class="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold">Create</button>
-                <button data-modal-hide="default-modal" type="button" class="py-2.5 px-5 ms-3 text-sm font-medium rounded-lg bg-gray-600 hover:bg-gray-700">Cancel</button>
+                <button data-modal-hide="default-modal" type="button" class="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="createRoom">Create</button>
+                <button data-modal-hide="default-modal" type="button" class="py-2.5 px-5 ms-3 text-sm font-medium rounded-lg bg-gray-600 hover:bg-gray-700" @click="newRoom.private = false;newRoom.open = false;newRoom.title = '';">Cancel</button>
             </div>
         </div>
-    </div>-->
+    </div>
     
+    <!--Room joining modal-->
+    <div v-if="joinRoomModal.open" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-40 flex justify-center items-center w-full md:inset-0 bg bg-gray-600/50">
+        <div class="relative w-full max-w-2xl max-h-full bg-gray-800 rounded-lg shadow p-6 text-white text-center">
+            <h3 class="text-xl font-semibold">
+                Join a Private Room
+            </h3>
+
+            <div class="py-4 font-semibold text-gray-400 align-middle">
+                <input placeholder="Room code" type="text" minlength="5" maxlength="5" class="w-80 py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none text-white" v-model="joinRoomModal.code">
+            </div>
+
+            <div class="flex justify-center">
+                <button data-modal-hide="default-modal" type="button" class="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="joinPrivateRoom">Join</button>
+                <button data-modal-hide="default-modal" type="button" class="py-2.5 px-5 ms-3 text-sm font-medium rounded-lg bg-gray-600 hover:bg-gray-700" @click="joinRoomModal.open = false;joinRoomModal.code = '';">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!--Username picker modal-->
+    <div v-if="usernameModal.open" class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 bottom-0 z-40 flex justify-center items-center w-full md:inset-0 bg bg-gray-600/50">
+        <div class="relative w-full max-w-2xl max-h-full bg-gray-800 rounded-lg shadow p-6 text-white text-center">
+            <h3 class="text-xl font-semibold">
+                Pick a Username
+            </h3>
+
+            <div class="py-4 font-semibold text-gray-400 align-middle">
+                <input placeholder="Username" type="text" class="w-80 py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none text-white" v-model="usernameModal.username">
+            </div>
+
+            <div class="flex justify-center">
+                <button data-modal-hide="default-modal" type="button" class="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="setUsername">Save</button>
+                <button data-modal-hide="default-modal" type="button" class="py-2.5 px-5 ms-3 text-sm font-medium rounded-lg bg-gray-600 hover:bg-gray-700" @click="usernameModal.open = false;usernameModal.username = context.username;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="flex flex-col h-screen bg-gray-900 text-white p-4">
         <div class="p-4 px-6 bg-gray-800 flex justify-between items-center rounded-lg">
             <h1 class="text-xl font-bold">
@@ -199,14 +325,14 @@ onMounted(() => {
                 }">{{ context.status.text }}</span>
             </h1>
 
-            <h1 class="px-4 py-2 text-xm font-bold p-1 rounded-md" :class="{
+            <h1 class="px-4 py-2 text-xm font-bold p-1 rounded-md z-50" :class="{
                 'bg-red-500': context.notif.status === 2,
                 'bg-yellow-500': context.notif.status === 1,
                 'bg-blue-500': context.notif.status === 0
             }" v-if="context.notif.showing">{{ context.notif.text }}</h1>
 
             <div class="flex items-center">
-                <button @click="promptUsername" class="w-full px-5 py-2.5 mr-4 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold">
+                <button @click="usernameModal.open = true" class="w-full px-5 py-2.5 mr-4 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold">
                     {{ context.username || 'Set Username' }}
                 </button>
 
@@ -216,22 +342,40 @@ onMounted(() => {
 
         <div class="flex flex-1 overflow-hidden mt-4 relative">
             <div class="w-64 p-4 pr-0 pb-32 bg-gray-800 rounded-lg">
-                <h3 class="font-bold">Rooms</h3>
+                <details open v-if="context.privateRooms.length !== 0">
+                    <summary class="font-bold cursor-pointer">
+                        Private Rooms
+                    </summary>
 
-                <ul class="overflow-y-scroll h-full scrollbar-transparent" v-if="context.rooms.length !== 0">
-                    <li v-for="(room, index) in context.rooms" :key="index" class="my-2 rounded-lg">
-                        <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
-                            {{ room.title }}
-                        </button>
-                    </li>
-                </ul>
+                    <ul class="overflow-y-scroll h-full scrollbar-transparent">
+                        <li v-for="(room, index) in context.privateRooms" :key="index" class="my-2 rounded-lg">
+                            <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
+                                {{ room.title }}
+                            </button>
+                        </li>
+                    </ul>
+                </details>
+                
+                <details :open="context.publicRooms.length !== 0">
+                    <summary class="font-bold cursor-pointer">
+                        Public Rooms
+                    </summary>
+
+                    <ul class="overflow-y-scroll h-full scrollbar-transparent" v-if="context.publicRooms.length !== 0">
+                        <li v-for="(room, index) in context.publicRooms" :key="index" class="my-2 rounded-lg">
+                            <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
+                                {{ room.title }}
+                            </button>
+                        </li>
+                    </ul>
+                </details>
 
                 <div class="absolute bottom-0 left-0 right-0 p-2 w-64 bg-gray-800 rounded-lg">
-                    <button class="w-full px-5 py-2.5 mb-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-sm font-bold">
+                    <button @click="joinRoomModal.open = true" class="w-full px-5 py-2.5 mb-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-sm font-bold">
                         Join Room
                     </button>
-                    
-                    <button @click="promptRoom" class="w-full px-5 py-2.5 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-bold">
+
+                    <button @click="newRoom.open = true" class="w-full px-5 py-2.5 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-bold">
                         Create Room
                     </button>
                 </div>
@@ -243,6 +387,11 @@ onMounted(() => {
 
             <div v-if="context.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
                 <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}</h3>
+                <h3 v-if="!!context.rooms.find((room) => {
+                    if (room.id === context.roomid && room.private) return true;
+                })" class="font-bold">Invite people with this code: {{ context.rooms.find((room) => {
+                    if (room.id === context.roomid && room.private) return true;
+                }).code }}</h3>
 
                 <ul>
                     <li v-for="(message, index) in context.messages" :key="index" :class="message.highlight ? 'highlight' + ((context.messages[index + 1]?.highlight ? ' below' : '') + (context.messages[index - 1]?.highlight ? ' above' : '')) : ''" v-html="message.msg" @click="deletemsg(message.id)"></li>

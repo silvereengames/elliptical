@@ -51,10 +51,8 @@ const password = async () => {
 }
 
 const getroom = async (socket) => {
-    const result = rooms.find({}, {
-        projection: {
-            _id: 0
-        }
+    const result = rooms.find({
+        private: false
     });
 
     for await (const room of result) {
@@ -235,11 +233,11 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('room', async (msg) => {
-        if (typeof msg !== 'string') return;
+    socket.on('room', async (room) => {
+        if (typeof room.title !== 'string') return;
 
-        const messageIncludesBlockedTerm = context.BLOCKED.some((term) => msg.replaceAll(' ', '').toLowerCase().includes(term));
-        const roomCount = await rooms.countDocuments();
+        const messageIncludesBlockedTerm = context.BLOCKED.some((term) => room.title.replaceAll(' ', '').toLowerCase().includes(term));
+        const roomCount = await rooms.countDocuments({ private: false });
 
         if (messageIncludesBlockedTerm) socket.emit('event', {
             message: 'Room name contains a blocked phrase',
@@ -254,7 +252,7 @@ io.on('connection', async (socket) => {
             status: 2
         });
         else {
-            if (msg.length >= 25) socket.emit('event', {
+            if (room.title.length >= 25) socket.emit('event', {
                 message: 'Too many characters in room name (25 max)',
                 status: 2
             });
@@ -262,20 +260,43 @@ io.on('connection', async (socket) => {
                 const id = uuid();
 
                 await rooms.insertOne({
-                    title: msg,
+                    title: room.title,
                     roomid: id,
+                    private: room.private && !!room.code,
+                    ...(room.private && room.code ? {
+                        code: room.code
+                    } : {}),
                     messages: []
                 });
 
-                io.to('home').emit('room', {
-                    title: msg,
+                if (room.private && room.code) socket.emit('room', {
+                    title: room.title,
+                    code: room.code,
+                    private: true,
+                    id
+                });
+                else io.to('home').emit('room', {
+                    title: room.title,
                     id
                 });
             }
         }
     });
 
-    socket.on('joinroom', async (id) => {
+    socket.on('join private', async (code) => {
+        try {
+            const room = await rooms.findOne({ code });
+
+            room.id = room.roomid;
+
+            delete room._id;
+            delete room.roomid;
+
+            socket.emit('room', room);
+        } catch {} // Room does not exist
+    });
+
+    socket.on('join', async (id) => {
         try {
             socket.join(id);
             socket.emit('joined', id);
@@ -287,6 +308,7 @@ io.on('connection', async (socket) => {
 
     socket.on('disconnect', () => {
         context.ONLINE--;
+
         io.emit('users', context.ONLINE);
     });
 
