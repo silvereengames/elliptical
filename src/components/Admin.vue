@@ -39,32 +39,32 @@ const toggleZap = () => {
     <div class="p-2 mt-2 bg-gray-800 rounded-lg text-center">
         <div class="flex justify-center">
             <form @submit.prevent="adminhandler(context.command)">
-                <input placeholder="Admin Password" type="password" class="px-4 py-2 bg-white text-black rounded-lg m-1 w-64" required v-model="context.adminpass">
-                <input placeholder="Admin command" type="text" autocomplete="off" class="px-4 py-2 bg-white text-black rounded-lg m-1 w-80" required v-model="context.command">
-                <input class="m-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg" type="submit">
+                <input placeholder="Admin Password" type="password" class="w-64 py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none" required v-model="context.adminpass">
+                <input placeholder="Admin command" type="text" autocomplete="off" class="w-80 py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none" required v-model="context.command">
+                <button class="m-1 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" type="submit">Submit</button>
             </form>
         </div>
         
         <div class="flex justify-center">
-            <input v-model="maxRooms" type="number" min="1" class="px-4 bg-white text-black rounded-lg m-1 w-64" placeholder="Max rooms" />
-            <button @click="updateMaxRooms" class="m-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg">
+            <input v-model="maxRooms" type="number" min="1" class="py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none" placeholder="Max rooms" />
+            <button @click="updateMaxRooms" class="m-1 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold">
                 Set Max Rooms
             </button>
         </div>
         
         <h2 class="text-xl">Quick Access:</h2>
         <div class="flex justify-center">
-            <button class="w-24 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="adminhandler('lockall')">Lock</button>
-            <button class="w-24 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="adminhandler('unlockall')">Unlock</button>
-            <button class="w-38 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="adminhandler('purge')">Purge Rooms</button>
-            <button class="w-38 px-4 py-2 m-1 bg-blue-500 hover:bg-blue-600 rounded-lg" @click="passchange()">Change Password</button>
+            <button class="w-24 m-1 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="adminhandler('lockall')">Lock</button>
+            <button class="w-24 m-1 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="adminhandler('unlockall')">Unlock</button>
+            <button class="w-38 m-1 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="adminhandler('purge')">Purge Rooms</button>
+            <button class="w-38 m-1 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold" @click="passchange()">Change Password</button>
             
             <div class="flex items-center">
                 <label class="m-1">Highlight:</label>
                 
                 <span :class="{
                         'bg-blue-500': context.highlight,
-                        'bg-gray-500': !context.highlight
+                        'bg-gray-600': !context.highlight
                     }"class="relative inline-block w-12 h-6 rounded-md transition-colors duration-300 ease-in-out cursor-pointer"
                     @click="toggleHighlight">
                     <span :class="{
@@ -79,7 +79,7 @@ const toggleZap = () => {
                 
                 <span :class="{
                         'bg-blue-500': context.delete,
-                        'bg-gray-500': !context.delete
+                        'bg-gray-600': !context.delete
                     }"class="relative inline-block w-12 h-6 rounded-md transition-colors duration-300 ease-in-out cursor-pointer"
                     @click="toggleZap">
                     <span :class="{
