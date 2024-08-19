@@ -2,7 +2,7 @@ import { MongoClient } from "mongodb"
 import { Server } from "socket.io"
 import { v4 as uuid } from "uuid"
 import express from "express"
-import { build } from "vite"
+import { createServer as createViteServer } from 'vite'
 
 import { createInterface } from "node:readline"
 import http from "node:http"
@@ -34,12 +34,18 @@ const context = {
   BLOCKED: ["example"],
 }
 
-// Build the frontend
-await build()
-console.log("✅ Successfully built frontend")
-
-app.use(express.static("dist"))
-app.use((req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")))
+// frontend
+if (process.argv.includes("--dev")) {
+  // Create a Vite dev server.
+  const vite = await createViteServer({
+    server: { middlewareMode: 'html' }
+  })
+  // Use Vite's middleware
+  app.use(vite.middlewares)
+} else {
+  app.use(express.static("dist"));
+  app.use((req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
+}
 
 const password = async () => {
   const result = await adminpass.findOne({ id: "admin" })
