@@ -5,7 +5,6 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "prestart": "vite build",
     "start": "node .",
     "start:dev": "concurrently \"vite\" \"node index.js --dev\"",
     "dev": "vite",

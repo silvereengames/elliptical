@@ -2,13 +2,12 @@ import { MongoClient } from "mongodb"
 import { Server } from "socket.io"
 import { v4 as uuid } from "uuid"
 import express from "express"
-import { createServer as createViteServer } from 'vite'
+import { build, createServer as createViteServer } from 'vite'
 
 import { createInterface } from "node:readline"
 import http from "node:http"
 import path from "node:path"
 import url from "node:url"
-import fs from "node:fs"
 
 // Initalize database stuff
 const client = new MongoClient(
@@ -36,15 +35,19 @@ const context = {
 
 // frontend
 if (process.argv.includes("--dev")) {
-  // Create a Vite dev server.
+  // if dev mode start vite server
   const vite = await createViteServer({
     server: { middlewareMode: 'html' }
   })
-  // Use Vite's middleware
   app.use(vite.middlewares)
+  console.log("✅ Vite development server served with middleware")
 } else {
+  // prod, serve from dist
+  console.log("🔁 Building for production...")
+  await build();
   app.use(express.static("dist"));
   app.use((req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
+  console.log("✅ Production build served from dist")
 }
 
 const password = async () => {
@@ -393,9 +396,7 @@ io.on("connection", async (socket) => {
 // Connect to the database
 try {
   await client.connect()
-
   console.log("✅ Connected to MongoDB")
-
   password()
 } catch (error) {
   console.error("❌ Error connecting to MongoDB", error)
