@@ -44,18 +44,19 @@
   });
   const usernameModal = reactive({
     open: false,
-    username: context.username,
-  });
-  const soundsEnabled = ref(localStorage.getItem("sounds") === null ? true : localStorage.getItem("sounds") === "true");
-  const messageSound = new Audio("/sounds/message.wav");
-  let latestMessage = "";
+    username: context.username
+});
+const soundsEnabled = ref(localStorage.getItem('sounds') === null ? true : localStorage.getItem('sounds') === 'true');
+const messageSound = new Audio('/sounds/message.wav');
+const messagesScrollable = ref(false);
+let latestMessage = '';
 
-  socket.off();
+socket.off();
 
-  console.log("Connecting to server...");
-  socket.on("connect", () => console.log("Connected to server with id", socket.id));
-  socket.on("disconnect", () => {
-    context.status.text = "Disconnected";
+console.log('Connecting to server...');
+socket.on('connect', () => console.log('Connected to server with id', socket.id));
+socket.on('disconnect', () => {
+    context.status.text = 'Disconnected';
     context.status.code = 2;
     context.online = 0;
   });
@@ -92,7 +93,10 @@
     context.rooms = context.rooms;
   });
 
-  socket.on("message", (message) => {
+socket.on('message', (message) => {
+    const messages = document.querySelector('#messages');
+    const shouldScroll = messages.offsetHeight == 0 || messages.scrollTop === messages.scrollHeight - messages.offsetHeight;
+    
     if (soundsEnabled && latestMessage !== message.message) messageSound.play();
 
     context.messages.push({
@@ -100,7 +104,14 @@
       highlight: message.highlight || false,
       msg: `<p>${sanitize(message.message)}</p>`,
     });
-  });
+    
+    // Wait for stuff to render
+    setTimeout(() => {
+        messagesScrollable.value = messages.scrollHeight > messages.clientHeight;
+        
+        if (shouldScroll) messages.scrollTop = messages.scrollHeight;
+    });
+});
 
   socket.on("users", (users) => (context.online = users));
 
@@ -482,30 +493,78 @@
           </div>
         </div>
 
-        <div v-if="context.roomid" class="flex-1 p-4 overflow-y-auto rounded-lg">
-          <div v-if="context.rooms.find(({ id }) => context.roomid === id).private" class="p-4 px-6 top-0 right-0 bg-gray-800 flex justify-between items-center rounded-lg absolute">
-            <button @click="copyCode" class="px-5 py-2.5 mr-3 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold">
-              {{ context.rooms.find(({ id }) => context.roomid === id).code }}
-            </button>
+        <div class="flex flex-1 overflow-hidden mt-4 relative">
+            <div class="w-64 bg-gray-800 rounded-lg">
+                <div class="p-4 overflow-y-auto overflow-x-hidden" :class="context.rooms.length === 0 ? '' : 'h-[calc(100%-6.5rem)]'">
+                    <details open v-if="context.privateRooms.length !== 0">
+                        <summary class="font-bold cursor-pointer">
+                            Private Rooms
+                        </summary>
 
-            <span class="h-10 mr-3 border-r border-white-100"></span>
+                        <ul class="h-full scrollbar-transparent">
+                            <li v-for="(room, index) in context.privateRooms" :key="index" class="my-2 rounded-lg">
+                                <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
+                                    {{ room.title }}
+                                </button>
+                            </li>
+                        </ul>
+                    </details>
 
-            <button @click="leave" class="px-5 py-2.5 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-bold">
-              Leave Room
-            </button>
-          </div>
+                    <details :open="context.publicRooms.length !== 0">
+                        <summary class="font-bold cursor-pointer">
+                            Public Rooms
+                        </summary>
 
-          <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}</h3>
+                        <ul class="h-full scrollbar-transparent" v-if="context.publicRooms.length !== 0">
+                            <li v-for="(room, index) in context.publicRooms" :key="index" class="my-2 rounded-lg">
+                                <button @click="joinRoom(room)" class="w-full px-4 py-2 rounded-lg" :class="room.highlight ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-blue-500 text-white hover:bg-blue-600'">
+                                    {{ room.title }}
+                                </button>
+                            </li>
+                        </ul>
+                    </details>
+                </div>
 
-          <ul>
-            <li
-              v-for="(message, index) in context.messages"
-              :key="index"
-              :class="message.highlight ? 'highlight' + ((context.messages[index + 1]?.highlight ? ' below' : '') + (context.messages[index - 1]?.highlight ? ' above' : '')) : ''"
-              v-html="message.msg"
-              @click="deletemsg(message.id)"
-            ></li>
-          </ul>
+                <p v-if="context.rooms.length === 0" class="ml-4 text-gray-300 text-sm">
+                    No active rooms, create one below
+                </p>
+
+                <div class="absolute bottom-0 left-0 right-0 p-2 w-64 bg-gray-800 rounded-lg">
+                    <button @click="joinRoomModal.open = true" class="w-full px-5 py-2.5 mb-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-sm font-bold">
+                        Join Room
+                    </button>
+
+                    <button @click="newRoom.open = true" class="w-full px-5 py-2.5 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-bold">
+                        Create Room
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="context.roomid" class="flex-1 p-4 overflow-y-auto" id="messages">
+                <div v-if="context.rooms.find(({ id }) => context.roomid === id).private" class="p-4 px-6 top-0 right-0 bg-gray-800 flex justify-between items-center rounded-lg absolute" :class="messagesScrollable ? 'mr-8' : ''">
+                    <button @click="copyCode"
+                        class="px-5 py-2.5 mr-3 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold">
+                        {{ context.rooms.find(({ id }) => context.roomid === id).code }}
+                    </button>
+
+                    <span class="h-10 mr-3 border-r border-white-100"></span>
+
+                    <button @click="leave" class="px-5 py-2.5 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-bold">
+                        Leave Room
+                    </button>
+                </div>
+
+                <h3 class="font-bold">Welcome to #{{ currentRoomTitle }}</h3>
+
+                <ul>
+                    <li v-for="(message, index) in context.messages" :key="index" :class="message.highlight ? 'highlight' + ((context.messages[index + 1]?.highlight ? ' below' : '') + (context.messages[index - 1]?.highlight ? ' above' : '')) : ''" v-html="message.msg" @click="deletemsg(message.id)"></li>
+                </ul>
+            </div>
+
+            <div v-else class="flex-1 p-4 rounded-lg flex flex-col items-center justify-center text-gray-400">
+                <h1>Welcome to Elliptical!</h1>
+                <h3>{{ context.rooms.length === 0 ? 'Create' : 'Select' }} a room to start chatting...</h3>
+            </div>
         </div>
 
         <div v-else class="flex-1 p-4 rounded-lg flex flex-col items-center justify-center text-gray-400">
