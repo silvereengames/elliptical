@@ -5,6 +5,7 @@ export const context = reactive({
   username: localStorage.getItem("username") || "",
   codes: [],
   messages: [],
+  reports: [],
   rooms: [],
   privateRooms: computed(
     () => context.rooms.filter((room) => room.private) || []

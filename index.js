@@ -2,7 +2,7 @@ import { MongoClient } from "mongodb"
 import { Server } from "socket.io"
 import { v4 as uuid } from "uuid"
 import express from "express"
-import { build, createServer as createViteServer } from 'vite'
+import { build, createServer as createViteServer } from "vite"
 
 import { createInterface } from "node:readline"
 import http from "node:http"
@@ -18,6 +18,7 @@ const client = new MongoClient(
 const db = client.db("elliptical")
 const rooms = db.collection("rooms")
 const adminpass = db.collection("admin-password")
+const reports = db.collection("reports")
 
 // Initalize server stuff
 const app = express()
@@ -37,16 +38,18 @@ const context = {
 if (process.argv.includes("--dev")) {
   // if dev mode start vite server
   const vite = await createViteServer({
-    server: { middlewareMode: 'html' }
+    server: { middlewareMode: "html" },
   })
   app.use(vite.middlewares)
   console.log("✅ Vite development server served with middleware")
 } else {
   // prod, serve from dist
   console.log("🔁 Building for production...")
-  await build();
-  app.use(express.static("dist"));
-  app.use((req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
+  await build()
+  app.use(express.static("dist"))
+  app.use((req, res) =>
+    res.sendFile(path.join(__dirname, "dist", "index.html"))
+  )
   console.log("✅ Production build served from dist")
 }
 
@@ -84,15 +87,28 @@ const get = async (socket, id) => {
     if (!room || !room.messages) return
 
     for (const message of room.messages) {
-      if (message.data === "message") socket.emit("message", message)
-      else socket.emit("message", message)
+      socket.emit("message", message)
     }
   } catch (error) {
     console.warn("❌ Error! " + error)
   }
 }
 
-const executeUserInput = async (input) => {
+const getReports = async (socket) => {
+  try {
+    const reportsCursor = reports.find({})
+    
+    // Send each report to the client
+    for await (const report of reportsCursor) {
+      const message ={msgid: report.msgid, roomid: report.roomid, message: report.message, time: report.timestamp}
+      socket.emit("report", message)
+    }
+  } catch (error) {
+    console.warn("❌ Error! " + error)
+  }
+}
+
+const executeUserInput = async (input, socket) => {
   try {
     const command = input.command
 
@@ -200,6 +216,9 @@ const executeUserInput = async (input) => {
           update: true,
         })
       }
+    } else if(command == "joinreports") {
+      socket.emit("joined", "reports")
+      getReports(socket)
     } else console.log("❌ An invalid command was provided:", command)
   } catch (error) {
     console.warn("❌ Error!", error)
@@ -339,6 +358,7 @@ io.on("connection", async (socket) => {
 
   socket.on("join", async (id) => {
     try {
+      console.log(id)
       socket.join(id)
       socket.emit("joined", id)
       get(socket, id)
@@ -353,8 +373,37 @@ io.on("connection", async (socket) => {
     io.emit("users", context.ONLINE)
   })
 
+  socket.on("report msg", async (msg) => {
+
+    try {
+      // Check if report already exists
+      const existingReport = await reports.findOne({
+        msgid: msg.msgid,
+        roomid: msg.roomid,
+      })
+
+      if (!existingReport) {
+        // Only insert if no existing report found
+        await reports.insertOne({
+          msgid: msg.msgid,
+          roomid: msg.roomid,
+          message: msg.message,
+          timestamp: new Date(),
+        })
+
+        console.log("📝 New report added:", msg)
+      }
+
+      socket.emit("event", {
+        message: "Message reported",
+      })
+    } catch (error) {
+      console.error("❌ Error handling report:", error)
+    }
+  })
+
   socket.on("admin handler", (msg) => {
-    if (msg.adminpass.includes(context.PASSWORD)) executeUserInput(msg)
+    if (msg.adminpass.includes(context.PASSWORD)) executeUserInput(msg, socket)
     else console.log("❌ Invalid admin password attempt: " + msg.adminpass)
   })
 
@@ -381,7 +430,6 @@ io.on("connection", async (socket) => {
   })
 
   socket.on("updateMaxRooms", (msg) => {
-    console.log(msg)
     if (msg.adminpass.includes(context.PASSWORD)) {
       context.MAX_ROOMS = msg.maxRooms
 
