@@ -381,6 +381,7 @@ io.on("connection", async (socket) => {
   })
 
   socket.on("updateMaxRooms", (msg) => {
+    console.log(msg)
     if (msg.adminpass.includes(context.PASSWORD)) {
       context.MAX_ROOMS = msg.maxRooms
 
