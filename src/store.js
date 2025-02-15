@@ -18,6 +18,7 @@ export const context = reactive({
   highlight: false,
   adminpass: "",
   command: "",
+  maxRooms: '',
   status: {
     code: 1,
     text: "Connecting",

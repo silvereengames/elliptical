@@ -11,8 +11,8 @@ const adminhandler = (command) =>
 
 const updateMaxRooms = () =>
   socket.emit("updateMaxRooms", {
-    adminpass: this.adminpass,
-    maxRooms: this.maxRooms,
+    adminpass: context.adminpass,
+    maxRooms: context.maxRooms,
   })
 
 const passchange = () =>
@@ -72,7 +72,7 @@ const toggleZap = () => {
 
     <div class="flex justify-center">
       <input
-        v-model="maxRooms"
+        v-model="context.maxRooms"
         type="number"
         min="1"
         class="py-2.5 px-5 m-1 text-sm font-medium rounded-lg border border-gray-400 bg-gray-600 outline-none"
