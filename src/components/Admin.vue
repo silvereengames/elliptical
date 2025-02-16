@@ -1,7 +1,7 @@
 <script setup>
-import { notif, hideNotif } from "@/utils"
-import { context } from "@/store"
-import socket from "@/socket"
+import { notif, hideNotif } from "@/assets/utils"
+import { context } from "@/assets/store"
+import socket from "@/assets/socket"
 
 const adminhandler = (command) =>
   socket.emit("admin handler", {

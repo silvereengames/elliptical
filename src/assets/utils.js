@@ -1,6 +1,6 @@
 import { v4 as uuid } from "uuid"
 
-import { context } from "@/store"
+import { context } from "@/assets/store"
 
 export const notif = (content, options = {}) => {
   options = {
