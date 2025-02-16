@@ -1,38 +1,19 @@
-import { MongoClient } from "mongodb"
-import { Server } from "socket.io"
 import { v4 as uuid } from "uuid"
-import express from "express"
 import { build, createServer as createViteServer } from "vite"
 
 import { createInterface } from "node:readline"
-import http from "node:http"
 import path from "node:path"
 import url from "node:url"
 
-// Initalize database stuff
-const client = new MongoClient(
-  process.argv[2] == "Docker"
-    ? "mongodb://mongodb:27017"
-    : "mongodb://127.0.0.1:27017"
-)
-const db = client.db("elliptical")
-const rooms = db.collection("rooms")
-const adminpass = db.collection("admin-password")
-const reports = db.collection("reports")
+import { io, app, server } from "./server/host.js"
+import { executeUserInput } from "./server/adminhandler.js"
+import { get, getroom } from "./server/functions.js"
+import { rooms, adminpass, reports, initializeDB } from "./server/mongo.js"
+import { context } from "./server/context.js"
 
 // Initalize server stuff
-const app = express()
-const server = http.createServer(app)
-const io = new Server(server)
-
 const __dirname = url.fileURLToPath(new URL("./", import.meta.url))
-const context = {
-  LOCKED: false,
-  ONLINE: 0,
-  PASSWORD: "changeme", // Should probably move this to a .env file later and make it unchangeable
-  MAX_ROOMS: 25,
-  BLOCKED: ["example"],
-}
+
 
 // frontend
 if (process.argv.includes("--dev")) {
@@ -51,178 +32,6 @@ if (process.argv.includes("--dev")) {
     res.sendFile(path.join(__dirname, "dist", "index.html"))
   )
   console.log("✅ Production build served from dist")
-}
-
-const password = async () => {
-  const result = await adminpass.findOne({ id: "admin" })
-
-  if (result) return (context.PASSWORD = result.password)
-
-  adminpass.insertOne({
-    id: "admin",
-    password: context.PASSWORD,
-  })
-}
-
-const getroom = async (socket) => {
-  const result = rooms.find({
-    private: false,
-  })
-
-  for await (const room of result) {
-    if (room.data === "room") socket.emit("room", room)
-    else
-      socket.emit("room", {
-        highlight: room.highlight,
-        title: room.title,
-        id: room.roomid,
-      })
-  }
-}
-
-const get = async (socket, id) => {
-  try {
-    const room = await rooms.findOne({ roomid: id })
-
-    if (!room || !room.messages) return
-
-    for (const message of room.messages) {
-      socket.emit("message", message)
-    }
-  } catch (error) {
-    console.warn("❌ Error! " + error)
-  }
-}
-
-const getReports = async (socket) => {
-  try {
-    const reportsCursor = reports.find({})
-    
-    // Send each report to the client
-    for await (const report of reportsCursor) {
-      const message ={msgid: report.msgid, roomid: report.roomid, message: report.message, time: report.timestamp}
-      socket.emit("report", message)
-    }
-  } catch (error) {
-    console.warn("❌ Error! " + error)
-  }
-}
-
-const executeUserInput = async (input, socket) => {
-  try {
-    const command = input.command
-
-    if (command.charAt(0) === "m")
-      io.emit("event", {
-        message: `Server: ${command.substring(2)}`,
-      })
-    else if (command == "lockall") {
-      io.emit("event", {
-        message: "Chat has been locked",
-        status: 1,
-      })
-      console.log("🔒 All chats locked!")
-
-      context.LOCKED = true
-    } else if (command == "unlockall") {
-      io.emit("event", {
-        message: "Chat has been unlocked",
-      })
-      console.log("🔓 All chats unlocked!")
-
-      context.LOCKED = false
-    } else if (command == "refresh") io.emit("reload", "")
-    else if (command == "purge") {
-      rooms.deleteMany({})
-
-      io.emit("purge")
-    } else if (command == "eval") {
-      console.log("🔁 Running eval...")
-
-      eval(input + "()")
-    } else if (command.includes("opentab")) {
-      // Should probably remove this as it is a security risk
-      let message = command.substring(7)
-
-      io.emit("opentab", message)
-    } else if (command == "deletemsg") {
-      await rooms.updateOne(
-        {
-          roomid: input.roomid,
-        },
-        {
-          $pull: {
-            messages: {
-              msgid: input.msgid,
-            },
-          },
-        }
-      )
-
-      io.to(input.roomid).emit("delete", {
-        type: "message",
-        id: input.msgid,
-      })
-    } else if (command == "deleteroom") {
-      await rooms.deleteOne({ roomid: input.roomid })
-
-      io.to("home").emit("delete", {
-        type: "room",
-        id: input.roomid,
-      })
-    } else if (command == "highlight") {
-      // Highlight messages in a room
-      if (!input.roomid) return
-
-      if (input.message) {
-        const id = uuid()
-
-        await rooms.updateOne(
-          {
-            roomid: input.roomid,
-          },
-          {
-            $push: {
-              messages: {
-                message: input.message,
-                msgid: id,
-                highlight: true,
-              },
-            },
-          }
-        )
-
-        io.to(input.roomid).emit("message", {
-          message: input.message,
-          id,
-          highlight: true,
-        })
-      } else {
-        await rooms.updateOne(
-          { roomid: input.roomid },
-          {
-            $set: {
-              highlight: true,
-            },
-          }
-        )
-
-        const room = await rooms.findOne({ roomid: input.roomid })
-
-        io.to("home").emit("room", {
-          title: room.title,
-          id: room.roomid,
-          highlight: true,
-          update: true,
-        })
-      }
-    } else if(command == "joinreports") {
-      socket.emit("joined", "reports")
-      getReports(socket)
-    } else console.log("❌ An invalid command was provided:", command)
-  } catch (error) {
-    console.warn("❌ Error!", error)
-  }
 }
 
 // Handle socket.io events
@@ -374,7 +183,6 @@ io.on("connection", async (socket) => {
   })
 
   socket.on("report msg", async (msg) => {
-
     try {
       // Check if report already exists
       const existingReport = await reports.findOne({
@@ -442,14 +250,7 @@ io.on("connection", async (socket) => {
   })
 })
 
-// Connect to the database
-try {
-  await client.connect()
-  console.log("✅ Connected to MongoDB")
-  password()
-} catch (error) {
-  console.error("❌ Error connecting to MongoDB", error)
-}
+await initializeDB()
 
 // Start the server
 server.listen(3000, () =>

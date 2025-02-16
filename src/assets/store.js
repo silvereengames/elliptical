@@ -1,4 +1,6 @@
-import { reactive, computed } from "vue"
+import { reactive, computed, ref } from "vue"
+
+export const path = location.pathname;
 
 export const context = reactive({
   input: "",
@@ -31,3 +33,25 @@ export const context = reactive({
     id: "",
   },
 })
+
+export const showMain = ref(false);
+
+export const newRoom = reactive({
+  open: false,
+  title: "",
+  private: false,
+});
+
+export const joinRoomModal = reactive({
+  open: false,
+  code: "",
+});
+
+export const usernameModal = reactive({
+  open: false,
+  username: context.username,
+});
+
+export const soundsEnabled = ref(localStorage.getItem("sounds") === null ? true : localStorage.getItem("sounds") === "true");
+
+export const latestMessage = ref("");
